@@ -20,7 +20,7 @@ const streamToBuffer = (stream) => {
 const augmentImage = (image) => {
     console.log('Augmenting image...');
 
-    const rotated = tf.image.rotateWithOffset(image, Math.random() * 80 - 40, 0.5, 0.5);
+    const rotated = tf.image.rotate(image, Math.random() * 80 - 40, 0.5, 0.5);
     const widthShift = Math.random() * 0.4 - 0.2;
     const heightShift = Math.random() * 0.4 - 0.2;
     const shifted = tf.image.translate(rotated, [widthShift * image.shape[1], heightShift * image.shape[0]]);
@@ -57,6 +57,10 @@ const loadImagesInBatches = async (folderPath, label, batchSize = 16, numAugment
                 const getObjectParams = { Bucket: bucket, Key: imageKey };
                 const imgData = await s3Client.send(new GetObjectCommand(getObjectParams));
                 const imgBuffer = await streamToBuffer(imgData.Body);
+                if (!imgBuffer || imgBuffer.length === 0) {
+                    console.error(`Empty image buffer for S3 Key: ${imageKey}`);
+                    return;
+                }
                 const imgTensor = await processImage({ buffer: imgBuffer });
 
                 if (imgTensor) {
@@ -100,6 +104,11 @@ exports.processDataInBatches = async (batchSize = 32, numAugmentations = 5) => {
         }
 
         const data = [...passImages, ...failImages];
+        if (data.length === 0) {
+            console.warn(`No valid data found for category: ${category}`);
+            return;
+        };
+        
         tf.util.shuffle(data);
 
         const tensors = data.map(d => d.tensor);
