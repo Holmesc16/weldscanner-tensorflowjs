@@ -4,7 +4,7 @@ const tf = require('@tensorflow/tfjs-node');
 const { S3Client, ListObjectsV2Command, GetObjectCommand } = require('@aws-sdk/client-s3');
 const { PromisePool } = require('@supercharge/promise-pool');
 
-const s3Client = new S3Client({ region: 'us-east-1' });
+const s3Client = new S3Client({ region: 'us-west-1' });
 const bucket = 'weldscanner';
 
 const streamToBuffer = (stream) => {
