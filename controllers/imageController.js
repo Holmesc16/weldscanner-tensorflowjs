@@ -3,7 +3,7 @@ const tfModel = require('../models/tfModel');
 const tf = require('@tensorflow/tfjs-node');
 const { S3Client, ListObjectsV2Command, GetObjectCommand } = require('@aws-sdk/client-s3');
 const { PromisePool } = require('@supercharge/promise-pool');
-
+const sharp = require('sharp');
 const s3Client = new S3Client({ region: 'us-west-1' });
 const bucket = 'weldscanner';
 
@@ -17,23 +17,37 @@ const streamToBuffer = (stream) => {
 };
 
 // Augments an image tensor with various transformations
-const augmentImage = (image) => {
-    console.log('Augmenting image...');
+const augmentImage = async (imageBuffer) => {
+    let sharpImage = sharp(imageBuffer);
+    const rotation = Math.floor(Math.random() * 80 - 40);
+    sharpImage = sharpImage.rotate(rotation);
 
-    const rotated = tf.image.rotate(image, Math.random() * 80 - 40, 0.5, 0.5);
-    const widthShift = Math.random() * 0.4 - 0.2;
-    const heightShift = Math.random() * 0.4 - 0.2;
-    const shifted = tf.image.translate(rotated, [widthShift * image.shape[1], heightShift * image.shape[0]]);
-    const zoom = Math.random() * 0.4 + 0.8;
-    const zoomed = tf.image.resizeBilinear(shifted, [image.shape[0] * zoom, image.shape[1] * zoom]);
-    const flipped = Math.random() > 0.5 ? tf.image.flipLeftRight(zoomed) : zoomed;
-    const finalFlip = Math.random() > 0.5 ? tf.image.flipUpDown(flipped) : flipped;
-    const brightnessAdjusted = tf.image.adjustBrightness(finalFlip, Math.random() * 0.4 - 0.2);
-    const contrastAdjusted = tf.image.adjustContrast(brightnessAdjusted, Math.random() * 1.5 + 0.5);
-    const noise = tf.randomNormal(image.shape, 0, 0.05);
-    const noised = tf.add(contrastAdjusted, noise);
+    if (Math.random() > 0.5) {
+        sharpImage = sharpImage.flip();
+    }
 
-    return tf.clipByValue(noised, 0, 1);
+    if (Math.random() > 0.5) {
+        sharpImage = sharpImage.flop();
+    }
+    
+    const zoomFactor = Math.random() * 0.4 + 0.8;
+    const width = Math.round(150 * zoomFactor);
+    const height = Math.round(150 * zoomFactor);
+    sharpImage = sharpImage.resize(width, height);
+
+    const augmentedBuffer = await sharpImage.toBuffer();
+
+    const imgTensor = tf.node.decodeImage(augmentedBuffer, 3)
+        .expandDims(0)
+        .toFloat()
+        .div(tf.scalar(255))
+        .sub(tf.scalar(0.5))
+        .div(tf.scalar(0.5));
+
+    augmentedBuffer.dispose();
+    sharpImage.dispose();
+
+    return imgTensor;
 };
 
 // Load images in batches and apply augmentation
@@ -57,6 +71,7 @@ const loadImagesInBatches = async (folderPath, label, batchSize = 16, numAugment
                 const getObjectParams = { Bucket: bucket, Key: imageKey };
                 const imgData = await s3Client.send(new GetObjectCommand(getObjectParams));
                 const imgBuffer = await streamToBuffer(imgData.Body);
+                
                 if (!imgBuffer || imgBuffer.length === 0) {
                     console.error(`Empty image buffer for S3 Key: ${imageKey}`);
                     return;
@@ -66,17 +81,13 @@ const loadImagesInBatches = async (folderPath, label, batchSize = 16, numAugment
                 if (imgTensor) {
                     images.push({ tensor: imgTensor, label });
 
-                    // Augment the image multiple times
-                    const augmentations = Array.from({ length: numAugmentations }, () => augmentImage(imgTensor));
-                    const augmentedImages = await Promise.all(augmentations);
-
-                    augmentedImages.forEach((augmented, i) => {
-                        images.push({ tensor: augmented, label });
+                    for (let i = 0; i < numAugmentations; i++) {
+                        const augmentedTensor = await augmentImage(imgTensor);
+                        images.push({ tensor: augmentedTensor, label });
                         console.log(`Augmented image #${index + 1}-${i + 1} from S3 Key: ${imageKey}`);
-                        augmented.dispose(); // Dispose augmented tensor
-                    });
-
-                    imgTensor.dispose(); // Dispose original tensor
+                        augmentedTensor.dispose();
+                    }   
+                    imgTensor.dispose();
                 }
             } catch (error) {
                 console.error(`Error processing image from S3 Key: ${imageKey}`, error);
@@ -87,7 +98,7 @@ const loadImagesInBatches = async (folderPath, label, batchSize = 16, numAugment
 };
 
 // Function to process data in batches, including loading and augmenting images
-exports.processDataInBatches = async (batchSize = 32, numAugmentations = 5) => {
+exports.processDataInBatches = async (batchSize = 16, numAugmentations = 5) => {
     console.log('Starting data processing...');
     const categories = ['butt', 'saddle', 'electro'];
     const xsList = [];
@@ -108,7 +119,7 @@ exports.processDataInBatches = async (batchSize = 32, numAugmentations = 5) => {
             console.warn(`No valid data found for category: ${category}`);
             return;
         };
-        
+
         tf.util.shuffle(data);
 
         const tensors = data.map(d => d.tensor);

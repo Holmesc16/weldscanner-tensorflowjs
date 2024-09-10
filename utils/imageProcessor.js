@@ -2,7 +2,7 @@ const tf = require('@tensorflow/tfjs-node');
 const sharp = require('sharp');
 
 module.exports = async (file) => {
-    console.log(`Processing image ${file.originalname || 'no name'}`);
+    console.log(`Processing image ${file}`);
 
     if (!file.buffer || file.buffer.length === 0) {
         console.error('Empty image buffer, skipping this file');
