@@ -1,0 +1,49 @@
+# Node.js related
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Logs
+logs/
+*.log
+
+# Environment variables
+.env
+*.env
+
+# Build files (if applicable)
+dist/
+build/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.swp
+
+# Patch files (if patch-package is used)
+patches/
+# TensorFlow-related (trained models and related files)
+trained_models/
+weldscanner_quality_model/
+
+# Ignore specific files that start with an underscore (_)
+_*
+
+._package-lock.json
+# Ignore backups or other temporary files
+*.bak
+*.old
+*.orig
+
+# IDE and editor-related files
+.idea/
+.vscode/
+*.iml
+*.sublime-workspace
+*.sublime-project
+
+# Ignore images folder
+images/
