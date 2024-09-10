@@ -2,14 +2,14 @@ const tf = require('@tensorflow/tfjs-node');
 const sharp = require('sharp');
 
 module.exports = async (file) => {
-    console.log(`Processing image: ${file.path}`);
+    console.log(`Processing image ${file.originalname || 'no name'}`);
 
     if (!file.buffer || !file.buffer.length === 0) {
         console.error('Empty image buffer, skipping this file');
         return null;
     }
     try {
-        const imageBuffer = await sharp(file.path)
+        const imageBuffer = await sharp(file.buffer)
             .resize(150, 150)
             .toFormat('jpeg')
             .toBuffer();
