@@ -2,14 +2,24 @@ const tf = require('@tensorflow/tfjs-node');
 const sharp = require('sharp');
 
 module.exports = async (file) => {
-    console.log({ file })
-    const imageBuffer = await sharp(file.path)
-        .resize(150, 150)
-        .toFormat('jpeg')
-        .toBuffer();
+    console.log(`Processing image: ${file.path}`);
 
-    return tf.node.decodeImage(imageBuffer, 3)
-        .expandDims()
-        .toFloat()
-        .div(tf.scalar(255));
+    if (!file.buffer || !file.buffer.length === 0) {
+        console.error('Empty image buffer, skipping this file');
+        return null;
+    }
+    try {
+        const imageBuffer = await sharp(file.path)
+            .resize(150, 150)
+            .toFormat('jpeg')
+            .toBuffer();
+
+        return tf.node.decodeImage(imageBuffer, 3)
+            .expandDims()
+            .toFloat()
+            .div(tf.scalar(255));
+    } catch (error) {
+        console.error('Error processing image:', error);
+        return null;
+    }
 }

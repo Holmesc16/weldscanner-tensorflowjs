@@ -96,12 +96,23 @@ exports.processDataInBatches = async (batchSize = 32, numAugmentations = 5) => {
         console.log(`Processing category: ${category}`);
         const passImages = await loadImagesInBatches(`${category}/pass`, 1, batchSize, numAugmentations);
         const failImages = await loadImagesInBatches(`${category}/fail`, 0, batchSize, numAugmentations);
+        console.log(`Loaded ${passImages.length} pass images and ${failImages.length} fail images for category: ${category}`);
+        
         const data = [...passImages, ...failImages];
+        if (data.length === 0) {
+            console.warn(`No images found for category: ${category}`);
+            return;
+        }
 
         console.log(`Shuffling and concatenating data for category: ${category}`);
         tf.util.shuffle(data);
         const tensors = data.map(d => d.tensor);
         const labels = data.map(d => d.label);
+
+        if (tensors.length === 0) {
+            console.warn(`No tensors found for category: ${category}`);
+            return;
+        }
 
         xsList.push(tf.concat(tensors, 0));
         ysList.push(tf.tensor1d(labels, 'int32'));
