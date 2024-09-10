@@ -4,8 +4,8 @@
   "description": "",
   "main": "app.js",
   "scripts": {
-    "start": "node --max-old-space-size=512 app.js",
-    "train-only": "node --max-old-space-size=512 app.js",
+    "start": "node --max-old-space-size=4096 app.js",
+    "train-only": "node --max-old-space-size=4096 app.js",
     "postinstall": "patch-package"
   },
   "author": "Cade Holmes",
