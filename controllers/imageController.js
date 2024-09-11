@@ -40,10 +40,9 @@ const augmentImage = async (imageBuffer) => {
         sharpImage = sharpImage.flop();
     }
 
-    const zoomFactor = Math.random() * 0.4 + 0.8;
-    const width = Math.round(150 * zoomFactor);
-    const height = Math.round(150 * zoomFactor);
-    sharpImage = sharpImage.resize(width, height);
+    const targetWidth = 150;
+    const targetHeight = 150;
+    sharpImage = sharpImage.resize(targetWidth, targetHeight);
 
     const augmentedBuffer = await sharpImage.toBuffer();
 
