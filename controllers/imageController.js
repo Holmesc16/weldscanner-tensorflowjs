@@ -48,9 +48,6 @@ const augmentImage = async (imageBuffer) => {
         .sub(tf.scalar(0.5))
         .div(tf.scalar(0.5));
 
-    augmentedBuffer.dispose();
-    sharpImage.dispose();
-
     return imgTensor;
 };
 
