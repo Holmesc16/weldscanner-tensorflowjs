@@ -7,6 +7,12 @@ const sharp = require('sharp');
 const s3Client = new S3Client({ region: 'us-west-1' });
 const bucket = 'weldscanner';
 
+// (async () => {
+//     await tf.setBackend('tensorflow');
+//     await tf.ready();
+//     console.log('TensorFlow backend set to TensorFlow.js');
+// })();
+
 const streamToBuffer = (stream) => {
     const chunks = [];
     return new Promise((resolve, reject) => {
@@ -86,9 +92,9 @@ const loadImagesInBatches = async (folderPath, label, batchSize = 16, numAugment
                         const augmentedTensor = await augmentImage(imgBuffer);
                         images.push({ tensor: augmentedTensor, label });
                         console.log(`Augmented image #${index + 1}-${i + 1} from S3 Key: ${imageKey}`);
-                        augmentedTensor.dispose();
+                        // augmentedTensor.dispose();
                     }   
-                    imgTensor.dispose();
+                    // imgTensor.dispose();
                 }
             } catch (error) {
                 console.error(`Error processing image from S3 Key: ${imageKey}`, error);
@@ -127,6 +133,7 @@ exports.processDataInBatches = async (batchSize = 16, numAugmentations = 5) => {
         const labels = data.map(d => d.label);
 
         if (tensors.length > 0) {
+            console.log(`Concatenating tensors for category ${category}`);
             xsList.push(tf.concat(tensors, 0));
             ysList.push(tf.tensor1d(labels, 'int32'));
             tensors.forEach(tensor => tensor.dispose());
@@ -138,7 +145,7 @@ exports.processDataInBatches = async (batchSize = 16, numAugmentations = 5) => {
     if (xsList.length === 0 || ysList.length === 0) {
         throw new Error('No valid data to process. Ensure that images are available in S3.');
     }
-
+    console.log('Concatenating tensors...');
     const xs = tf.concat(xsList);
     const ys = tf.concat(ysList);
 
@@ -162,8 +169,8 @@ exports.handleImage = async (req, res) => {
         console.log(`Prediction: ${result}`);
         res.json({ result });
 
-        img.dispose();
-        prediction.dispose();
+        // img.dispose();
+        // prediction.dispose();
     } catch (err) {
         console.error('Error handling image prediction:', err);
         res.status(500).json({ error: err.message });
