@@ -18,6 +18,10 @@ const streamToBuffer = (stream) => {
 
 // Augments an image tensor with various transformations
 const augmentImage = async (imageBuffer) => {
+    if (!imageBuffer || imageBuffer.length === 0) {
+        throw new Error('Invalid image buffer');
+    }
+
     let sharpImage = sharp(imageBuffer);
     const rotation = Math.floor(Math.random() * 80 - 40);
     sharpImage = sharpImage.rotate(rotation);
@@ -29,7 +33,7 @@ const augmentImage = async (imageBuffer) => {
     if (Math.random() > 0.5) {
         sharpImage = sharpImage.flop();
     }
-    
+
     const zoomFactor = Math.random() * 0.4 + 0.8;
     const width = Math.round(150 * zoomFactor);
     const height = Math.round(150 * zoomFactor);
@@ -82,7 +86,7 @@ const loadImagesInBatches = async (folderPath, label, batchSize = 16, numAugment
                     images.push({ tensor: imgTensor, label });
 
                     for (let i = 0; i < numAugmentations; i++) {
-                        const augmentedTensor = await augmentImage(imgTensor);
+                        const augmentedTensor = await augmentImage(imgBuffer);
                         images.push({ tensor: augmentedTensor, label });
                         console.log(`Augmented image #${index + 1}-${i + 1} from S3 Key: ${imageKey}`);
                         augmentedTensor.dispose();
