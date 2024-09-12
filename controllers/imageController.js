@@ -25,11 +25,14 @@ const streamToBuffer = (stream) => {
 
 // Augments an image tensor with various transformations
 const augmentImage = async (imageBuffer) => {
-    return await tf.tidy(() => {
-        if (!imageBuffer || imageBuffer.length === 0) {
-            throw new Error('Invalid image buffer');
-        }
+    if (!imageBuffer || imageBuffer.length === 0) {
+        throw new Error('Invalid image buffer');
+    }
 
+    let augmentedBuffer;
+    let imgTensor;
+
+    try {
         let sharpImage = sharp(imageBuffer);
         const rotation = Math.floor(Math.random() * 80 - 40);
         sharpImage = sharpImage.rotate(rotation);
@@ -46,17 +49,25 @@ const augmentImage = async (imageBuffer) => {
         const targetHeight = 150;
         sharpImage = sharpImage.resize(targetWidth, targetHeight);
 
-        const augmentedBuffer = sharpImage.toBuffer();
+        augmentedBuffer = await sharpImage.toBuffer();
 
-        const imgTensor = tf.node.decodeImage(augmentedBuffer, 3)
-            .expandDims(0)
-            .toFloat()
-            .div(tf.scalar(255))
-            .sub(tf.scalar(0.5))
-            .div(tf.scalar(0.5));
+        imgTensor = tf.tidy(() => {
+            return tf.node.decodeImage(augmentedBuffer, 3)
+                .expandDims(0)
+                .toFloat()
+                .div(tf.scalar(255))
+                .sub(tf.scalar(0.5))
+                .div(tf.scalar(0.5));
+        });
 
         return imgTensor;
-    });
+    } catch (error) {
+        console.error('Error augmenting image:', error.message);
+        if (imgTensor) {
+            imgTensor.dispose();
+        }
+        throw error;
+    }
 };
 
 // Load images in batches and apply augmentation
@@ -105,7 +116,7 @@ const loadImagesInBatches = async (folderPath, label, batchSize = 16, numAugment
 };
 
 // Function to process data in batches, including loading and augmenting images
-exports.processDataInBatches = async (batchSize = 8, numAugmentations = 3) => {
+exports.processDataInBatches = async (batchSize = 4, numAugmentations = 5) => {
     console.log('Starting data processing...');
     const categories = ['butt', 'saddle', 'electro'];
     const xsList = [];
