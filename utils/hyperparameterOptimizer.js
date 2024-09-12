@@ -60,10 +60,6 @@ const objective = async (params) => {
     const valAcc = history.history.val_accuracy[history.history.val_accuracy.length - 1];
     console.log('Validation accuracy for parameters', params, ':', valAcc);
 
-    // xs.dispose();
-    // ys.dispose();
-    // model.dispose();
-
     return -valAcc;
 };
 

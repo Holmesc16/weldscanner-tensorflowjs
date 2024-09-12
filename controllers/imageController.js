@@ -7,6 +7,7 @@ const sharp = require('sharp');
 const s3Client = new S3Client({ region: 'us-west-1' });
 const bucket = 'weldscanner';
 
+// Initialize TensorFlow.js backend
 (async () => {
     await tf.setBackend('tensorflow');
     await tf.ready();
@@ -91,9 +92,7 @@ const loadImagesInBatches = async (folderPath, label, batchSize = 16, numAugment
                         const augmentedTensor = await augmentImage(imgBuffer);
                         images.push({ tensor: augmentedTensor, label });
                         console.log(`Augmented image #${index + 1}-${i + 1} from S3 Key: ${imageKey}`);
-                        augmentedTensor.dispose();
-                    }   
-                    imgTensor.dispose();
+                    }
                 }
             } catch (error) {
                 console.error(`Error processing image from S3 Key: ${imageKey}`, error);
@@ -135,7 +134,6 @@ exports.processDataInBatches = async (batchSize = 16, numAugmentations = 5) => {
             console.log(`Concatenating tensors for category ${category}`);
             xsList.push(tf.concat(tensors, 0));
             ysList.push(tf.tensor1d(labels, 'int32'));
-            tensors.forEach(tensor => tensor.dispose());
         } else {
             console.warn(`No tensors generated for category: ${category}`);
         }
@@ -147,6 +145,10 @@ exports.processDataInBatches = async (batchSize = 16, numAugmentations = 5) => {
     console.log('Concatenating tensors...');
     const xs = tf.concat(xsList);
     const ys = tf.concat(ysList);
+
+    // Dispose tensors after concatenation
+    xsList.forEach(tensor => tensor.dispose());
+    ysList.forEach(tensor => tensor.dispose());
 
     console.log('Data processing completed.');
     return { xs, ys };
@@ -168,6 +170,7 @@ exports.handleImage = async (req, res) => {
         console.log(`Prediction: ${result}`);
         res.json({ result });
 
+        // Dispose tensors after prediction
         img.dispose();
         prediction.dispose();
     } catch (err) {

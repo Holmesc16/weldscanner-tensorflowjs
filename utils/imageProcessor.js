@@ -29,9 +29,6 @@ module.exports = async (file) => {
         console.error('Error processing image:', error.message);
         return null;
     } finally {
-        if (tensor) {
-            tensor.dispose();
-        }
         if (file.buffer) {
             file.buffer = null;
         }
