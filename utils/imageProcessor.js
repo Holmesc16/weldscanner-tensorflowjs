@@ -2,6 +2,7 @@ const tf = require('@tensorflow/tfjs-node');
 const sharp = require('sharp');
 
 module.exports = async (file) => {
+    let tensor;
     try {
         console.log(`Processing image with buffer length: ${file.buffer.length}`);
         if (!file || !file.buffer || file.buffer.length === 0) {
@@ -16,7 +17,7 @@ module.exports = async (file) => {
             .toFormat('jpeg')
             .toBuffer();
 
-        const tensor = tf.node.decodeImage(resizedBuffer, 3)
+        tensor = tf.node.decodeImage(resizedBuffer, 3)
             .expandDims()
             .toFloat()
             .div(tf.scalar(255))
@@ -27,5 +28,12 @@ module.exports = async (file) => {
     } catch (error) {
         console.error('Error processing image:', error.message);
         return null;
+    } finally {
+        if (tensor) {
+            tensor.dispose();
+        }
+        if (file.buffer) {
+            file.buffer = null;
+        }
     }
 };
