@@ -25,36 +25,38 @@ const streamToBuffer = (stream) => {
 
 // Augments an image tensor with various transformations
 const augmentImage = async (imageBuffer) => {
-    if (!imageBuffer || imageBuffer.length === 0) {
-        throw new Error('Invalid image buffer');
-    }
+    return await tf.tidy(() => {
+        if (!imageBuffer || imageBuffer.length === 0) {
+            throw new Error('Invalid image buffer');
+        }
 
-    let sharpImage = sharp(imageBuffer);
-    const rotation = Math.floor(Math.random() * 80 - 40);
-    sharpImage = sharpImage.rotate(rotation);
+        let sharpImage = sharp(imageBuffer);
+        const rotation = Math.floor(Math.random() * 80 - 40);
+        sharpImage = sharpImage.rotate(rotation);
 
-    if (Math.random() > 0.5) {
-        sharpImage = sharpImage.flip();
-    }
+        if (Math.random() > 0.5) {
+            sharpImage = sharpImage.flip();
+        }
 
-    if (Math.random() > 0.5) {
-        sharpImage = sharpImage.flop();
-    }
+        if (Math.random() > 0.5) {
+            sharpImage = sharpImage.flop();
+        }
 
-    const targetWidth = 150;
-    const targetHeight = 150;
-    sharpImage = sharpImage.resize(targetWidth, targetHeight);
+        const targetWidth = 150;
+        const targetHeight = 150;
+        sharpImage = sharpImage.resize(targetWidth, targetHeight);
 
-    const augmentedBuffer = await sharpImage.toBuffer();
+        const augmentedBuffer = sharpImage.toBuffer();
 
-    const imgTensor = tf.node.decodeImage(augmentedBuffer, 3)
-        .expandDims(0)
-        .toFloat()
-        .div(tf.scalar(255))
-        .sub(tf.scalar(0.5))
-        .div(tf.scalar(0.5));
+        const imgTensor = tf.node.decodeImage(augmentedBuffer, 3)
+            .expandDims(0)
+            .toFloat()
+            .div(tf.scalar(255))
+            .sub(tf.scalar(0.5))
+            .div(tf.scalar(0.5));
 
-    return imgTensor;
+        return imgTensor;
+    });
 };
 
 // Load images in batches and apply augmentation
@@ -103,7 +105,7 @@ const loadImagesInBatches = async (folderPath, label, batchSize = 16, numAugment
 };
 
 // Function to process data in batches, including loading and augmenting images
-exports.processDataInBatches = async (batchSize = 16, numAugmentations = 5) => {
+exports.processDataInBatches = async (batchSize = 8, numAugmentations = 3) => {
     console.log('Starting data processing...');
     const categories = ['butt', 'saddle', 'electro'];
     const xsList = [];
