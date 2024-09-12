@@ -7,6 +7,12 @@ const sharp = require('sharp');
 const s3Client = new S3Client({ region: 'us-west-1' });
 const bucket = 'weldscanner';
 
+(async () => {
+    await tf.setBackend('tensorflow');
+    await tf.ready();
+    console.log('TensorFlow backend set to TensorFlow.js');
+})();
+
 const streamToBuffer = (stream) => {
     const chunks = [];
     return new Promise((resolve, reject) => {
@@ -98,7 +104,7 @@ const loadImagesInBatches = async (folderPath, label, batchSize = 16, numAugment
 };
 
 // Function to process data in batches, including loading and augmenting images
-exports.processDataInBatches = async (batchSize = 4, numAugmentations = 5) => {
+exports.processDataInBatches = async (batchSize = 16, numAugmentations = 5) => {
     console.log('Starting data processing...');
     const categories = ['butt', 'saddle', 'electro'];
     const xsList = [];
