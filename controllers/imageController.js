@@ -181,10 +181,15 @@ exports.createDataset = async () => {
     // Batch and shuffle the dataset
     const batchedDataset = dataset.shuffle(1000).batch(batchSize);
 
-    batchedDataset.size = async () => datasetSize;
+    const adjustedDataset = batchedDataset.map(({ xs, ys}) => {
+        ys = ys.squeeze();
+        return { xs, ys };
+    });
+
+    adjustedDataset.size = async () => datasetSize;
 
     console.log('Data processing completed.');
-    return batchedDataset;
+    return adjustedDataset;
 };
 
 // Handle image prediction
