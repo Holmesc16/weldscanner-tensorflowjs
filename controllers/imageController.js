@@ -155,7 +155,7 @@ exports.createDataset = async (batchSize) => {
         .batch(batchSize);
 
     console.log('Data processing completed.');
-    return dataset;
+    return { dataset, totalSize: xsTensor.shape[0] };
 };
 
 // Handle image prediction

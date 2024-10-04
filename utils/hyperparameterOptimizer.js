@@ -43,10 +43,11 @@ const objective = async (params) => {
     console.log('Evaluating hyperparameters:', params);
 
     // Create the dataset with the specified batch size
-    const dataGenerator = await createDataset(params.batchSize);
+    const { dataset: dataGenerator, totalSize } = await createDataset(params.batchSize);
 
+    console.log(`Total size: ${totalSize}`);
+    
     // Split the dataset into training and validation datasets
-    const totalSize = await dataGenerator.size().then(size => size);
     const valSize = Math.floor(totalSize * 0.2);
     const trainSize = totalSize - valSize;
 

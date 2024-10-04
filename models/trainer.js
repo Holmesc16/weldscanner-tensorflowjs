@@ -12,7 +12,7 @@ const trainModel = async () => {
         console.log('Best hyperparameters:', bestParams);
 
         console.log('Starting data processing...');
-        const dataGenerator = await createDataset(bestParams.batchSize);
+        const { dataset: dataGenerator } = await createDataset(bestParams.batchSize);
         console.log('Data processing completed.');
 
         // Fetch one batch from the dataset without consuming the original dataset
