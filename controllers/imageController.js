@@ -115,7 +115,7 @@ exports.createDataset = async (batchSize) => {
             }
 
             const imgTensor = await processImage({ buffer: imgBuffer });
-            const ys = tf.scalar(label, 'float32'); // Convert label to scalar tensor
+            const ys = tf.tensor1d([label], 'float32'); // Convert label to scalar tensor
 
             // Push the original image data
             dataQueue.push({ xs: imgTensor, ys });
@@ -174,7 +174,7 @@ exports.createDataset = async (batchSize) => {
     const batchedDataset = dataset.shuffle(1000).batch(batchSize);
 
     const adjustedDataset = batchedDataset.map(({ xs, ys }) => {
-        ys = ys.reshape([-1]); // Reshape labels to [batch_size]
+        ys = ys.squeeze(); // Reshape labels to [batch_size]
         console.log('Adjusted ys shape:', ys.shape);
         return { xs, ys };
     });

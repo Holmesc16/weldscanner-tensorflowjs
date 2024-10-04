@@ -16,6 +16,14 @@ const trainModel = async () => {
     const dataGenerator = await createDataset(bestParams.batchSize);
     console.log('Data processing completed.');
 
+    // Fetch one batch from the dataset without consuming the original dataset
+    await dataGenerator.take(1).forEachAsync(({ xs, ys }) => {
+        console.log('Input xs shape:', xs.shape); // Expected: [batch_size, height, width, channels]
+        console.log('Input ys shape:', ys.shape); // Expected: [batch_size]
+        xs.dispose();
+        ys.dispose();
+    });
+
     // Create model with best hyperparameters
     const model = tf.sequential();
 
@@ -32,7 +40,6 @@ const trainModel = async () => {
     model.add(tf.layers.dense({ units: 128, activation: 'relu' }));
     model.add(tf.layers.dropout({ rate: 0.5 }));
     model.add(tf.layers.dense({ units: 1, activation: 'sigmoid' }));
-    model.add(tf.layers.flatten()); // Flatten output to shape [batch_size]
 
     // Compile the model
     model.compile({
@@ -50,7 +57,7 @@ const trainModel = async () => {
     // Verify model output shape
     const testInput = tf.zeros([bestParams.batchSize, 150, 150, 3]);
     const testOutput = model.predict(testInput);
-    console.log('Model output shape:', testOutput.shape); // Should be [batch_size]
+    console.log('Model output shape:', testOutput.shape); // Should be [batch_size, 1]
     testInput.dispose();
     testOutput.dispose();
 
