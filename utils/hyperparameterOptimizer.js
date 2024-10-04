@@ -56,6 +56,9 @@ const objective = async (params) => {
     const trainDataset = dataGenerator.take(trainSize);
     const valDataset = dataGenerator.skip(trainSize);
 
+    const valBatches = await valDataset.cardinality().then(c => c);
+    console.log(`Validation batches: ${valBatches}`);
+
     // Create the model with the current hyperparameters
     const model = tf.sequential();
 
@@ -118,7 +121,7 @@ const objective = async (params) => {
         const history = await model.fitDataset(trainDataset, {
             epochs: 10,
             validationData: valDataset,
-            callbacks: [earlyStopping]
+            // callbacks: [earlyStopping]
         });
 
         // Get the final validation accuracy
@@ -128,7 +131,7 @@ const objective = async (params) => {
         return valAcc; // Return the validation accuracy
     } catch (error) {
         console.error('Error during model training:', error);
-        return -Infinity; // Return a very low score to indicate failure
+        throw error; // Return a very low score to indicate failure
     } finally {
         console.log('Model training completed.');
         // Dispose of the model and variables to free up memory

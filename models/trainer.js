@@ -66,8 +66,12 @@ const trainModel = async () => {
         // Compile the model
         model.compile({
             optimizer: 'adam',
-            loss: 'binaryCrossentropy',
-            metrics: ['accuracy']
+            loss: (yTrue, yPred) => {
+                const loss = tf.losses.meanSquaredError(yTrue, yPred);
+                console.log('Loss:', loss.dataSync()[0]);
+                return loss;
+            },
+            // metrics: ['accuracy']
         });
 
         // Define callbacks
