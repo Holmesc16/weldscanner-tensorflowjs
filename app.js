@@ -1,7 +1,9 @@
 require('dotenv').config();
-const { main } = require('./models/trainer.js');
+const { trainModel } = require('./models/trainer.js');
+
 console.log('Training mode enabled. Starting training...');
-main()
+
+trainModel()
     .then(() => {
         console.log('Model training complete.');
         process.exit(0);

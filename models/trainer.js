@@ -64,3 +64,5 @@ const trainModel = async () => {
 trainModel().catch(err => {
     console.error('Error during training:', err);
 });
+
+module.exports = { trainModel };
