@@ -1,5 +1,5 @@
-const processImage = require('../utils/imageProcessor');
-const tfModel = require('../models/tfModel');
+const processImage = require('../utils/imageProcessor.js');
+const tfModel = require('../models/tfModel.js');
 const tf = require('@tensorflow/tfjs-node');
 const { S3Client, ListObjectsV2Command, GetObjectCommand } = require('@aws-sdk/client-s3');
 const sharp = require('sharp');

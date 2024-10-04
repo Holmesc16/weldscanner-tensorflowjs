@@ -1,5 +1,5 @@
 const tf = require('@tensorflow/tfjs-node');
-const { createDataset } = require('../controllers/imageController');
+const { createDataset } = require('../controllers/imageController.js');
 
 // Define the search space for hyperparameters
 const searchSpace = {

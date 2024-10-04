@@ -2,8 +2,8 @@
 
 const tf = require('@tensorflow/tfjs-node');
 const path = require('path');
-const { createDataset } = require('../controllers/imageController');
-const runHyperparameterOptimization = require('../utils/hyperparameterOptimization');
+const { createDataset } = require('../controllers/imageController.js');
+const runHyperparameterOptimization = require('../utils/hyperparameterOptimizer.js');
 
 const trainModel = async () => {
     console.log('Starting hyperparameter optimization...');
