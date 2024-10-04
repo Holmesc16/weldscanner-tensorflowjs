@@ -20,7 +20,6 @@ const processImage = async (file) => {
 
         const tensor = tf.tidy(() => {
             return tf.node.decodeImage(resizedBuffer, 3)
-                .expandDims()
                 .toFloat()
                 .div(255.0)
                 .sub(0.5)

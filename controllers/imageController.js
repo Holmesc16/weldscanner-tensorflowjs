@@ -3,7 +3,7 @@ const tfModel = require('../models/tfModel.js');
 const tf = require('@tensorflow/tfjs-node');
 const { S3Client, ListObjectsV2Command, GetObjectCommand } = require('@aws-sdk/client-s3');
 const sharp = require('sharp');
-
+const async = require('async');
 const s3Client = new S3Client({ region: 'us-west-1' });
 const bucket = 'weldscanner';
 const categories = ['butt', 'saddle', 'electro'];
@@ -53,11 +53,10 @@ const augmentImage = async (imageBuffer) => {
 
         const imgTensor = tf.tidy(() => {
             return tf.node.decodeImage(augmentedBuffer, 3)
-                .expandDims(0)
                 .toFloat()
                 .div(255.0)
                 .sub(0.5)
-                .div(0.5);
+                .div(0.5); // Shape: [height, width, channels]
         });
 
         return imgTensor;
@@ -104,75 +103,90 @@ exports.createDataset = async () => {
     // Shuffle the image entries to randomize the dataset
     tf.util.shuffle(imageEntries);
 
-    // Create a dataset using tf.data API
-    const dataset = tf.data.generator(() => {
-        let index = 0;
-        let augmentationIndex = -1;
-        let imgBuffer = null;
+    // Create a data queue to store processed data
+    const dataQueue = [];
+    let isProcessing = true;
+    let processingError = null;
 
+    // Set up the async queue with concurrency limit
+    const processingQueue = async.queue(async (task, cb) => {
+        try {
+            const { Key: imageKey, label } = task;
+
+            const getObjectParams = { Bucket: bucket, Key: imageKey };
+            const imgData = await s3Client.send(new GetObjectCommand(getObjectParams));
+            const imgBuffer = await streamToBuffer(imgData.Body);
+
+            if (!imgBuffer || imgBuffer.length === 0) {
+                console.error(`Empty image buffer for S3 Key: ${imageKey}`);
+                cb();
+                return;
+            }
+
+            const imgTensor = await processImage({ buffer: imgBuffer });
+            const ys = label;
+
+            // Push the original image data
+            dataQueue.push({ xs: imgTensor, ys });
+
+            // Generate augmented images
+            for (let i = 0; i < numAugmentations; i++) {
+                try {
+                    const augmentedTensor = await augmentImage(imgBuffer);
+                    dataQueue.push({ xs: augmentedTensor, ys });
+                } catch (error) {
+                    console.error('Error during augmentation:', error);
+                    continue;
+                }
+            }
+
+            cb();
+        } catch (error) {
+            console.error(`Error processing image from S3 Key: ${task.Key}`, error);
+            processingError = error;
+            cb(error);
+        }
+    }, 15); // Set concurrency limit
+
+    // Enqueue all image entries
+    processingQueue.push(imageEntries);
+
+    // When the queue is drained, set isProcessing to false
+    processingQueue.drain(() => {
+        isProcessing = false;
+    });
+
+    // Create a dataset using tf.data.generator
+    const dataset = tf.data.generator(() => {
         return {
             async next() {
-                while (true) {
-                    if (augmentationIndex >= 0) {
-                        // Augmentation mode
-                        if (augmentationIndex < numAugmentations) {
-                            try {
-                                const augmentedTensor = await augmentImage(imgBuffer);
-                                const ys = imageEntries[index].label;
-                                const xs = augmentedTensor;
-                                augmentationIndex++;
-                                return { value: { xs, ys }, done: false };
-                            } catch (error) {
-                                console.error('Error during augmentation:', error);
-                                augmentationIndex++;
-                                continue;
-                            }
+                // Wait for data to be available or processing to finish
+                while (dataQueue.length === 0) {
+                    if (!isProcessing) {
+                        if (processingError) {
+                            throw processingError;
                         } else {
-                            augmentationIndex = -1;
-                            index++;
-                        }
-                    } else {
-                        if (index >= imageEntries.length) {
-                            // All data processed
                             return { done: true };
                         }
-
-                        const { Key: imageKey, label } = imageEntries[index];
-
-                        try {
-                            const getObjectParams = { Bucket: bucket, Key: imageKey };
-                            const imgData = await s3Client.send(new GetObjectCommand(getObjectParams));
-                            imgBuffer = await streamToBuffer(imgData.Body);
-
-                            if (!imgBuffer || imgBuffer.length === 0) {
-                                console.error(`Empty image buffer for S3 Key: ${imageKey}`);
-                                index++;
-                                continue;
-                            }
-
-                            const imgTensor = await processImage({ buffer: imgBuffer });
-                            const ys = label;
-                            const xs = imgTensor;
-                            augmentationIndex = 0; // Start augmentation after this
-                            return { value: { xs, ys }, done: false };
-                        } catch (error) {
-                            console.error(`Error processing image from S3 Key: ${imageKey}`, error);
-                            index++;
-                            continue;
-                        }
                     }
+                    // Wait a bit before checking again
+                    await new Promise(resolve => setTimeout(resolve, 100));
                 }
+
+                const data = dataQueue.shift();
+                return { value: data, done: false };
             }
         };
     });
 
     const datasetSize = imageEntries.length * (numAugmentations + 1);
     console.log(`Dataset size: ${datasetSize}`);
+
     // Batch and shuffle the dataset
     const batchedDataset = dataset.shuffle(1000).batch(batchSize);
 
     batchedDataset.size = async () => datasetSize;
-    
+
     console.log('Data processing completed.');
     return batchedDataset;
 };
