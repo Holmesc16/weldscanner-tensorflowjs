@@ -1,3 +1,5 @@
+// imageController.js
+
 const processImage = require('../utils/imageProcessor.js');
 const tfModel = require('../models/tfModel.js');
 const tf = require('@tensorflow/tfjs-node');
@@ -145,26 +147,22 @@ exports.createDataset = async (batchSize) => {
 
     console.log(`Total samples after augmentation: ${dataSamples.length}`);
 
-    // Prepare xs and ys tensors
-    const xsArray = dataSamples.map(sample => sample.xs);
-    const ysArray = dataSamples.map(sample => sample.ys);
+    // Create dataset from dataSamples
+    let dataset = tf.data.array(dataSamples);
 
-    // Stack xs tensors
-    const xsTensor = tf.stack(xsArray);
-    // Create ys tensor
-    const ysTensor = tf.tensor1d(ysArray, 'float32').reshape([-1, 1]);
+    // Map over the dataset to ensure labels are tensors
+    dataset = dataset.map(sample => {
+        return {
+            xs: sample.xs,
+            ys: tf.tensor1d([sample.ys], 'float32') // Shape: [1]
+        };
+    });
 
-    // Dispose individual xs tensors to free up memory
-    xsArray.forEach(tensor => tensor.dispose());
-
-    // Create dataset from tensors
-    const dataset = tf.data
-        .datasetFromTensorSlices({ xs: xsTensor, ys: ysTensor })
-        .shuffle(1000)
-        .batch(batchSize);
+    // Shuffle and batch the dataset
+    dataset = dataset.shuffle(1000).batch(batchSize);
 
     console.log('Data processing completed.');
-    return { dataset, totalSize: xsTensor.shape[0] };
+    return { dataset, totalSize: dataSamples.length };
 };
 
 // Handle image prediction
