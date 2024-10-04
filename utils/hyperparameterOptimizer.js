@@ -91,7 +91,7 @@ const objective = async (params) => {
     model.add(tf.layers.maxPooling2d({ poolSize: [2, 2] }));
 
     // Global Average Pooling instead of Flatten
-    model.add(tf.layers.globalAveragePooling2d());
+    model.add(tf.layers.globalAveragePooling2d({ dataFormat: 'channelsLast' }));
 
     // Dense Layers
     model.add(tf.layers.dense({ units: params.denseUnits, activation: 'relu' }));
