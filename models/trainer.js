@@ -40,7 +40,6 @@ const trainModel = async () => {
     model.add(tf.layers.dense({ units: 128, activation: 'relu' }));
     model.add(tf.layers.dropout({ rate: 0.5 }));
     model.add(tf.layers.dense({ units: 1, activation: 'sigmoid' }));
-    model.add(tf.layers.flatten());
 
     // Compile the model
     model.compile({

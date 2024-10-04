@@ -174,7 +174,8 @@ exports.createDataset = async (batchSize) => {
     const batchedDataset = dataset.shuffle(1000).batch(batchSize);
 
     const adjustedDataset = batchedDataset.map(({ xs, ys }) => {
-        ys = ys.squeeze(); // Reshape labels to [batch_size]
+        ys = ys.reshape([-1, 1]); // reshape labels to [batch_size, 1]
+        ys = ys.cast('float32'); // ensure labels are float32
         console.log('Adjusted ys shape:', ys.shape);
         return { xs, ys };
     });
