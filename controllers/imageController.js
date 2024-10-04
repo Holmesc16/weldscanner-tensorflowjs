@@ -109,7 +109,7 @@ exports.createDataset = async () => {
     let processingError = null;
 
     // Set up the async queue with concurrency limit
-    const processingQueue = async.queue(async (task, cb) => {
+    const processingQueue = async.queue(async (task) => {
         try {
             const { Key: imageKey, label } = task;
 
@@ -119,7 +119,6 @@ exports.createDataset = async () => {
 
             if (!imgBuffer || imgBuffer.length === 0) {
                 console.error(`Empty image buffer for S3 Key: ${imageKey}`);
-                cb();
                 return;
             }
 
@@ -139,12 +138,9 @@ exports.createDataset = async () => {
                     continue;
                 }
             }
-
-            cb();
         } catch (error) {
             console.error(`Error processing image from S3 Key: ${task.Key}`, error);
             processingError = error;
-            cb(error);
         }
     }, 15); // Set concurrency limit
 
