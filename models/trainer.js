@@ -7,7 +7,7 @@ const runHyperparameterOptimization = require('../utils/hyperparameterOptimizer.
 
 const trainModel = async () => {
     await tf.ready();
-    
+
     console.log('Starting hyperparameter optimization...');
     const bestParams = await runHyperparameterOptimization();
     console.log('Best hyperparameters:', bestParams);
@@ -32,6 +32,7 @@ const trainModel = async () => {
     model.add(tf.layers.dense({ units: 128, activation: 'relu' }));
     model.add(tf.layers.dropout({ rate: 0.5 }));
     model.add(tf.layers.dense({ units: 1, activation: 'sigmoid' }));
+    model.add(tf.layers.flatten()); // Flatten output to shape [batch_size]
 
     // Compile the model
     model.compile({
@@ -45,6 +46,13 @@ const trainModel = async () => {
         tf.callbacks.earlyStopping({ monitor: 'val_loss', patience: 5 }),
         tf.node.tensorBoard('./logs')
     ];
+
+    // Verify model output shape
+    const testInput = tf.zeros([bestParams.batchSize, 150, 150, 3]);
+    const testOutput = model.predict(testInput);
+    console.log('Model output shape:', testOutput.shape); // Should be [batch_size]
+    testInput.dispose();
+    testOutput.dispose();
 
     // Train the model using the dataset
     await model.fitDataset(dataGenerator, {

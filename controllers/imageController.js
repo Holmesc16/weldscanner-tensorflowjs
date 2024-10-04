@@ -175,7 +175,7 @@ exports.createDataset = async () => {
     const batchedDataset = dataset.shuffle(1000).batch(batchSize);
 
     const adjustedDataset = batchedDataset.map(({ xs, ys}) => {
-        ys = ys.squeeze();
+        ys = ys.reshape([-1])
         return { xs, ys };
     });
 
