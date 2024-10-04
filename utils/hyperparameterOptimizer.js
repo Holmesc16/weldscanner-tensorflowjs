@@ -1,5 +1,3 @@
-// hyperparameterOptimizer.js
-
 const tf = require('@tensorflow/tfjs-node');
 const { createDataset } = require('../controllers/imageController.js');
 
@@ -14,19 +12,6 @@ const searchSpace = {
     denseUnits: [16, 32],
     l2: [0.01, 0.001],
     batchSize: [16, 32]
-};
-
-class MetricsLogger extends tf.CustomCallback {
-    async onEpochEnd(epoch, logs) {
-        console.log(`Epoch ${epoch}: loss = ${logs.loss}, accuracy = ${logs.acc}`);
-        console.log(`Logs: ${logs}`);
-        if (logs.loss === null || isNaN(logs.loss)) {
-            console.error('Invalid loss value:', logs.loss);
-        }
-        if (logs.acc === null || isNaN(logs.acc)) {
-            console.error('Invalid accuracy value:', logs.acc);
-        }
-    }
 };
 
 // Generate all combinations of hyperparameters
@@ -132,7 +117,7 @@ const objective = async (params) => {
         const history = await model.fitDataset(trainDataset, {
             epochs: 10,
             validationData: valDataset,
-            callbacks: [new MetricsLogger()]
+            callbacks: [earlyStopping]
         });
 
         // Get the final validation accuracy
