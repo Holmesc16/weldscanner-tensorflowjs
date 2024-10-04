@@ -2,10 +2,15 @@ const processImage = require('../utils/imageProcessor');
 const tfModel = require('../models/tfModel');
 const tf = require('@tensorflow/tfjs-node');
 const { S3Client, ListObjectsV2Command, GetObjectCommand } = require('@aws-sdk/client-s3');
-const { PromisePool } = require('@supercharge/promise-pool');
 const sharp = require('sharp');
+
 const s3Client = new S3Client({ region: 'us-west-1' });
 const bucket = 'weldscanner';
+const categories = ['butt', 'saddle', 'electro'];
+const batchSize = 16;
+const numAugmentations = 5;
+const targetWidth = 150;
+const targetHeight = 150;
 
 // Initialize TensorFlow.js backend
 (async () => {
@@ -29,9 +34,6 @@ const augmentImage = async (imageBuffer) => {
         throw new Error('Invalid image buffer');
     }
 
-    let augmentedBuffer;
-    let imgTensor;
-
     try {
         let sharpImage = sharp(imageBuffer);
         const rotation = Math.floor(Math.random() * 80 - 40);
@@ -45,126 +47,130 @@ const augmentImage = async (imageBuffer) => {
             sharpImage = sharpImage.flop();
         }
 
-        const targetWidth = 150;
-        const targetHeight = 150;
         sharpImage = sharpImage.resize(targetWidth, targetHeight);
 
-        augmentedBuffer = await sharpImage.toBuffer();
+        const augmentedBuffer = await sharpImage.toBuffer();
 
-        imgTensor = tf.tidy(() => {
+        const imgTensor = tf.tidy(() => {
             return tf.node.decodeImage(augmentedBuffer, 3)
                 .expandDims(0)
                 .toFloat()
-                .div(tf.scalar(255))
-                .sub(tf.scalar(0.5))
-                .div(tf.scalar(0.5));
+                .div(255.0)
+                .sub(0.5)
+                .div(0.5);
         });
 
         return imgTensor;
     } catch (error) {
         console.error('Error augmenting image:', error.message);
-        if (imgTensor) {
-            imgTensor.dispose();
-        }
         throw error;
     }
 };
 
-// Load images in batches and apply augmentation
-const loadImagesInBatches = async (folderPath, label, batchSize = 16, numAugmentations = 5) => {
-    const params = { Bucket: bucket, Prefix: folderPath };
-    const data = await s3Client.send(new ListObjectsV2Command(params));
-
-    if (!data.Contents || data.Contents.length === 0) {
-        console.warn(`No images found in S3 folder: ${folderPath}`);
-        return [];
-    }
-
-    const imageKeys = data.Contents.map(obj => obj.Key);
-    const images = [];
-
-    await PromisePool
-        .for(imageKeys)
-        .withConcurrency(batchSize)
-        .process(async (imageKey, index) => {
-            try {
-                const getObjectParams = { Bucket: bucket, Key: imageKey };
-                const imgData = await s3Client.send(new GetObjectCommand(getObjectParams));
-                const imgBuffer = await streamToBuffer(imgData.Body);
-                
-                if (!imgBuffer || imgBuffer.length === 0) {
-                    console.error(`Empty image buffer for S3 Key: ${imageKey}`);
-                    return;
-                }
-                const imgTensor = await processImage({ buffer: imgBuffer });
-
-                if (imgTensor) {
-                    images.push({ tensor: imgTensor, label });
-
-                    for (let i = 0; i < numAugmentations; i++) {
-                        const augmentedTensor = await augmentImage(imgBuffer);
-                        images.push({ tensor: augmentedTensor, label });
-                        console.log(`Augmented image #${index + 1}-${i + 1} from S3 Key: ${imageKey}`);
-                    }
-                }
-            } catch (error) {
-                console.error(`Error processing image from S3 Key: ${imageKey}`, error);
-            }
-        });
-
-    return images;
-};
-
-// Function to process data in batches, including loading and augmenting images
-exports.processDataInBatches = async (batchSize = 4, numAugmentations = 5) => {
+// Function to create dataset using tf.data API
+exports.createDataset = async () => {
     console.log('Starting data processing...');
-    const categories = ['butt', 'saddle', 'electro'];
-    const xsList = [];
-    const ysList = [];
 
-    await Promise.all(categories.map(async (category) => {
-        console.log(`Processing category: ${category}`);
-        const passImages = await loadImagesInBatches(`${category}/pass`, 1, batchSize, numAugmentations);
-        const failImages = await loadImagesInBatches(`${category}/fail`, 0, batchSize, numAugmentations);
+    // Helper function to get all image keys from S3
+    const getAllImageKeys = async () => {
+        const imageEntries = [];
 
-        if (passImages.length === 0 && failImages.length === 0) {
-            console.warn(`No images found for category: ${category}`);
-            return;
+        for (const category of categories) {
+            for (const labelName of ['pass', 'fail']) {
+                const label = labelName === 'pass' ? 1 : 0;
+                const folderPath = `${category}/${labelName}`;
+                const params = { Bucket: bucket, Prefix: folderPath };
+                const data = await s3Client.send(new ListObjectsV2Command(params));
+
+                if (!data.Contents || data.Contents.length === 0) {
+                    console.warn(`No images found in S3 folder: ${folderPath}`);
+                    continue;
+                }
+
+                const entries = data.Contents.map(obj => ({ Key: obj.Key, label }));
+                imageEntries.push(...entries);
+            }
         }
 
-        const data = [...passImages, ...failImages];
-        if (data.length === 0) {
-            console.warn(`No valid data found for category: ${category}`);
-            return;
-        };
+        return imageEntries;
+    };
 
-        tf.util.shuffle(data);
+    const imageEntries = await getAllImageKeys();
 
-        const tensors = data.map(d => d.tensor);
-        const labels = data.map(d => d.label);
-
-        if (tensors.length > 0) {
-            console.log(`Concatenating tensors for category ${category}`);
-            xsList.push(tf.concat(tensors, 0));
-            ysList.push(tf.tensor1d(labels, 'int32'));
-        } else {
-            console.warn(`No tensors generated for category: ${category}`);
-        }
-    }));
-
-    if (xsList.length === 0 || ysList.length === 0) {
+    if (imageEntries.length === 0) {
         throw new Error('No valid data to process. Ensure that images are available in S3.');
     }
-    console.log('Concatenating tensors...');
-    const xs = tf.concat(xsList);
-    const ys = tf.concat(ysList);
 
-    // Dispose tensors after concatenation
-    xsList.forEach(tensor => tensor.dispose());
-    ysList.forEach(tensor => tensor.dispose());
+    // Shuffle the image entries to randomize the dataset
+    tf.util.shuffle(imageEntries);
+
+    // Create a dataset using tf.data API
+    const dataset = tf.data.generator(() => {
+        let index = 0;
+        let augmentationIndex = -1;
+        let imgBuffer = null;
+
+        return {
+            async next() {
+                while (true) {
+                    if (augmentationIndex >= 0) {
+                        // Augmentation mode
+                        if (augmentationIndex < numAugmentations) {
+                            try {
+                                const augmentedTensor = await augmentImage(imgBuffer);
+                                const ys = imageEntries[index].label;
+                                const xs = augmentedTensor;
+                                augmentationIndex++;
+                                return { value: { xs, ys }, done: false };
+                            } catch (error) {
+                                console.error('Error during augmentation:', error);
+                                augmentationIndex++;
+                                continue;
+                            }
+                        } else {
+                            augmentationIndex = -1;
+                            index++;
+                        }
+                    } else {
+                        if (index >= imageEntries.length) {
+                            // All data processed
+                            return { done: true };
+                        }
+
+                        const { Key: imageKey, label } = imageEntries[index];
+
+                        try {
+                            const getObjectParams = { Bucket: bucket, Key: imageKey };
+                            const imgData = await s3Client.send(new GetObjectCommand(getObjectParams));
+                            imgBuffer = await streamToBuffer(imgData.Body);
+
+                            if (!imgBuffer || imgBuffer.length === 0) {
+                                console.error(`Empty image buffer for S3 Key: ${imageKey}`);
+                                index++;
+                                continue;
+                            }
+
+                            const imgTensor = await processImage({ buffer: imgBuffer });
+                            const ys = label;
+                            const xs = imgTensor;
+                            augmentationIndex = 0; // Start augmentation after this
+                            return { value: { xs, ys }, done: false };
+                        } catch (error) {
+                            console.error(`Error processing image from S3 Key: ${imageKey}`, error);
+                            index++;
+                            continue;
+                        }
+                    }
+                }
+            }
+        };
+    });
+
+    // Batch and shuffle the dataset
+    const batchedDataset = dataset.shuffle(1000).batch(batchSize);
 
     console.log('Data processing completed.');
-    return { xs, ys };
+    return batchedDataset;
 };
 
 // Handle image prediction
@@ -178,7 +184,8 @@ exports.handleImage = async (req, res) => {
         }
 
         const prediction = await tfModel.predict(img);
-        const result = prediction.dataSync()[0] > 0.5 ? 'Pass' : 'Fail';
+        const predictionValue = prediction.dataSync()[0];
+        const result = predictionValue > 0.5 ? 'Pass' : 'Fail';
 
         console.log(`Prediction: ${result}`);
         res.json({ result });

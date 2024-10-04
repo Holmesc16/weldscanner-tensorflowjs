@@ -1,29 +1,52 @@
 const tf = require('@tensorflow/tfjs-node');
-const { processDataInBatches } = require('../controllers/imageController');
-const { combinations } = require('simple-statistics');
+const { createDataset } = require('../controllers/imageController');
 
+// Define the search space for hyperparameters
 const searchSpace = {
-    filters: [32, 64, 128, 256],
-    kernelSize: [3, 5, 7, 9],
-    l2: [0.01, 0.001, 0.0001, 0.00001],
-    batchSize: [16, 32, 64, 128]
+    filters: [32, 64],
+    kernelSize: [3, 5],
+    l2: [0.01, 0.001],
+    batchSize: [16, 32]
 };
 
+// Generate all combinations of hyperparameters
 const createHyperparameterCombinations = (space) => {
     const keys = Object.keys(space);
     const values = keys.map(key => space[key]);
-    const allCombinations = combinations(values.flat());
-    return allCombinations.map(combination => {
+    const combinations = cartesianProduct(...values);
+
+    return combinations.map(combination => {
         const params = {};
         combination.forEach((value, index) => {
-            params[keys[index % keys.length]] = value;
+            params[keys[index]] = value;
         });
         return params;
     });
 };
 
+// Helper function to compute the cartesian product of arrays
+const cartesianProduct = (...arrays) => {
+    return arrays.reduce((acc, curr) => {
+        return acc.flatMap(d => curr.map(e => [...d, e]));
+    }, [[]]);
+};
+
+// Objective function to evaluate hyperparameters
 const objective = async (params) => {
     console.log('Evaluating hyperparameters:', params);
+
+    // Create the dataset with the specified batch size
+    const dataGenerator = await createDataset(params.batchSize);
+
+    // Split the dataset into training and validation datasets
+    const totalSize = await dataGenerator.size().then(size => size);
+    const valSize = Math.floor(totalSize * 0.2);
+    const trainSize = totalSize - valSize;
+
+    const trainDataset = dataGenerator.take(trainSize);
+    const valDataset = dataGenerator.skip(trainSize);
+
+    // Create the model with the current hyperparameters
     const model = tf.sequential();
 
     model.add(tf.layers.conv2d({
@@ -36,33 +59,44 @@ const objective = async (params) => {
     model.add(tf.layers.batchNormalization());
     model.add(tf.layers.maxPooling2d({ poolSize: [2, 2] }));
     model.add(tf.layers.flatten());
-    model.add(tf.layers.dense({ units: 512, activation: 'relu' }));
+    model.add(tf.layers.dense({ units: 128, activation: 'relu' }));
     model.add(tf.layers.dropout({ rate: 0.5 }));
     model.add(tf.layers.dense({ units: 1, activation: 'sigmoid' }));
 
+    // Compile the model
     model.compile({
         optimizer: 'adam',
         loss: 'binaryCrossentropy',
         metrics: ['accuracy']
     });
 
-    const { xs, ys } = await processDataInBatches(params.batchSize);
-
+    // Define early stopping callback
     const earlyStopping = tf.callbacks.earlyStopping({ monitor: 'val_loss', patience: 3 });
 
-    const history = await model.fit(xs, ys, {
-        epochs: 50,  // Increase epochs to allow early stopping to take effect
-        validationSplit: 0.2,
-        batchSize: params.batchSize,
-        callbacks: [earlyStopping]
-    });
+    try {
+        // Train the model
+        const history = await model.fitDataset(trainDataset, {
+            epochs: 10,
+            validationData: valDataset,
+            callbacks: [earlyStopping]
+        });
 
-    const valAcc = history.history.val_accuracy[history.history.val_accuracy.length - 1];
-    console.log('Validation accuracy for parameters', params, ':', valAcc);
+        // Get the final validation accuracy
+        const valAcc = history.history.val_accuracy[history.history.val_accuracy.length - 1];
+        console.log('Validation accuracy for parameters', params, ':', valAcc);
 
-    return -valAcc;
+        return valAcc; // Return the validation accuracy
+    } catch (error) {
+        console.error('Error during model training:', error);
+        return -Infinity; // Return a very low score to indicate failure
+    } finally {
+        // Dispose of the model and variables to free up memory
+        model.dispose();
+        tf.disposeVariables();
+    }
 };
 
+// Function to run hyperparameter optimization
 const runHyperparameterOptimization = async () => {
     const hyperparameterCombinations = createHyperparameterCombinations(searchSpace);
     let bestScore = -Infinity;
