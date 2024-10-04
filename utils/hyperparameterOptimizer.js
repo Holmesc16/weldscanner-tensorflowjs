@@ -56,8 +56,6 @@ const objective = async (params) => {
     const trainDataset = dataGenerator.take(trainSize);
     const valDataset = dataGenerator.skip(trainSize);
 
-    const valBatches = await valDataset.cardinality().then(c => c);
-    console.log(`Validation batches: ${valBatches}`);
 
     // Create the model with the current hyperparameters
     const model = tf.sequential();
