@@ -113,12 +113,20 @@ exports.createDataset = async (batchSize) => {
 
             // Process original image
             const imgTensor = await processImage({ buffer: imgBuffer });
+            if (!imgTensor) {
+                console.error(`Invalid image tensor for S3 Key: ${imageKey}`);
+                continue;
+            }
             dataSamples.push({ xs: imgTensor, ys: label });
 
             // Generate augmented images
             for (let i = 0; i < numAugmentations; i++) {
                 try {
                     const augmentedTensor = await augmentImage(imgBuffer);
+                    if (!augmentedTensor) {
+                        console.error(`Invalid augmented image tensor for S3 Key: ${imageKey}`);
+                        continue;
+                    }
                     dataSamples.push({ xs: augmentedTensor, ys: label });
                 } catch (error) {
                     console.error('Error during augmentation:', error);
@@ -128,43 +136,55 @@ exports.createDataset = async (batchSize) => {
         } catch (error) {
             console.error(`Error processing image from S3 Key: ${entry.Key}`, error);
             processingError = error;
-            break; // Exit the loop if there's a critical error
+            continue;
         }
     }
 
     if (processingError) {
-        throw processingError;
+        console.error('Critical error during data processing:', processingError);
     }
 
     console.log(`Total samples after augmentation: ${dataSamples.length}`);
 
-    let dataset = tf.data.array(dataSamples);
+    const xsArray = dataSamples.map(sample => sample.xs);
+    const ysArray = dataSamples.map(sample => sample.ys);
 
-    dataset = dataset.map(sample => {
-        if (tf.any(tf.isNaN(sample.xs)).dataSync()[0]) {
-            console.log('Invalid input tensor:', sample);
-            return null;
-        }
-        if (tf.any(tf.isNaN(sample.ys)).dataSync()[0]) {
-            console.log('Invalid label tensor:', sample);
-            return null;
-        }
-        if (typeof sample.ys !== 'number' || isNaN(sample.ys)) {
-            console.log('Invalid label value:', sample.ys);
-            return null;
-        }
-        if (!sample.xs || (!sample.ys && sample.ys !== 0)) {
-            console.log('Invalid sample:', sample);
-            return null;
-        }
-        return {
-            xs: sample.xs,
-            ys: tf.tensor1d([sample.ys], 'float32')
-        }
-    })
-    .filter(sample => sample !== null);
+    const xsTensor = tf.tensor(xsArray);
+    const ysTensor = tf.tensorId(ysArray, 'float32').reshape([-1, 1]);
 
-    dataset = dataset.shuffle(1000).batch(batchSize);
+    xsArray.forEach(tensor => tensor.dispose());
+
+    const dataset = tf.data.zip({ xs: tf.data.array(xsArray), ys: tf.data.array(ysTensor) })
+    .shuffle(1000)
+    .batch(batchSize); 
+    
+    // let dataset = tf.data.array(dataSamples);
+
+    // dataset = dataset.map(sample => {
+    //     if (tf.any(tf.isNaN(sample.xs)).dataSync()[0]) {
+    //         console.log('Invalid input tensor:', sample);
+    //         return null;
+    //     }
+    //     if (tf.any(tf.isNaN(sample.ys)).dataSync()[0]) {
+    //         console.log('Invalid label tensor:', sample);
+    //         return null;
+    //     }
+    //     if (typeof sample.ys !== 'number' || isNaN(sample.ys)) {
+    //         console.log('Invalid label value:', sample.ys);
+    //         return null;
+    //     }
+    //     if (!sample.xs || (!sample.ys && sample.ys !== 0)) {
+    //         console.log('Invalid sample:', sample);
+    //         return null;
+    //     }
+    //     return {
+    //         xs: sample.xs,
+    //         ys: tf.tensor1d([sample.ys], 'float32')
+    //     }
+    // })
+    // .filter(sample => sample !== null);
+
+    // dataset = dataset.shuffle(1000).batch(batchSize);
 
     console.log('Data processing completed.');
     return { dataset, totalSize: dataSamples.length };

@@ -18,17 +18,16 @@ const processImage = async (file) => {
             .toFormat('jpeg')
             .toBuffer();
 
-        const tensor = tf.tidy(() => {
-            const imgTensor = tf.node.decodeImage(resizedBuffer, 3)
-                .toFloat()
-                .div(255.0)
-                .sub(0.5)
-                .div(0.5);
-            return tf.keep(imgTensor); // Keep the tensor to prevent it from being disposed
-        });
+        
+        const imgTensor = tf.node.decodeImage(resizedBuffer, 3)
+            .toFloat()
+            .div(255.0)
+            .sub(0.5)
+            .div(0.5);
 
-        return tensor;
-    } catch (error) {
+        return imgTensor;
+    }
+    catch (error) {
         console.error('Error processing image:', error.message);
         return null;
     } finally {

@@ -19,6 +19,7 @@ const trainModel = async () => {
         await dataGenerator.take(1).forEachAsync(({ xs, ys }) => {
             console.log('Input xs shape:', xs.shape); // Expected: [batch_size, height, width, channels]
             console.log('Input ys shape:', ys.shape); // Expected: [batch_size, 1]
+            console.log('Sample ys dtype:', ys.dtype);
         });
 
         // Create model with best hyperparameters
@@ -66,12 +67,8 @@ const trainModel = async () => {
         // Compile the model
         model.compile({
             optimizer: 'adam',
-            loss: (yTrue, yPred) => {
-                const loss = tf.losses.meanSquaredError(yTrue, yPred);
-                console.log('Loss:', loss.dataSync()[0]);
-                return loss;
-            },
-            // metrics: ['accuracy']
+            loss: 'binaryCrossentropy',
+            metrics: ['accuracy']
         });
 
         // Define callbacks
