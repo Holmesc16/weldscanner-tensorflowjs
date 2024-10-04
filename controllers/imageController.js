@@ -138,24 +138,19 @@ exports.createDataset = async (batchSize) => {
 
     console.log(`Total samples after augmentation: ${dataSamples.length}`);
 
-    // Convert dataSamples to tensors
-    const xsArray = dataSamples.map(sample => sample.xs);
-    const ysArray = dataSamples.map(sample => sample.ys);
+    let dataset = tf.data.array(dataSamples);
 
-    // Stack tensors
-    const xsTensor = tf.stack(xsArray);
-    const ysTensor = tf.tensor1d(ysArray, 'float32').reshape([-1, 1]);
+    dataset = dataset.map(sample => {
+        return {
+            xs: sample.xs,
+            ys: tf.tensor1d([sample.ys], 'float32')
+        }
+    })
 
-    // Dispose individual tensors to free up memory
-    xsArray.forEach(tensor => tensor.dispose());
-
-    // Create a TensorFlow.js dataset
-    const dataset = tf.data.array({ xs: xsTensor, ys: ysTensor })
-        .shuffle(1000)
-        .batch(batchSize);
+    dataset = dataset.shuffle(1000).batch(batchSize);
 
     console.log('Data processing completed.');
-    return { dataset, totalSize: xsTensor.shape[0] };
+    return { dataset, totalSize: dataSamples.length };
 };
 
 // Handle image prediction
