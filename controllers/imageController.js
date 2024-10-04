@@ -3,7 +3,6 @@ const tfModel = require('../models/tfModel.js');
 const tf = require('@tensorflow/tfjs-node');
 const { S3Client, ListObjectsV2Command, GetObjectCommand } = require('@aws-sdk/client-s3');
 const sharp = require('sharp');
-const async = require('async');
 const s3Client = new S3Client({ region: 'us-west-1' });
 const bucket = 'weldscanner';
 const categories = ['butt', 'saddle', 'electro'];
@@ -146,48 +145,26 @@ exports.createDataset = async (batchSize) => {
 
     console.log(`Total samples after augmentation: ${dataSamples.length}`);
 
+    // Prepare xs and ys tensors
     const xsArray = dataSamples.map(sample => sample.xs);
     const ysArray = dataSamples.map(sample => sample.ys);
 
-    const xsTensor = tf.tensor(xsArray);
-    const ysTensor = tf.tensorId(ysArray, 'float32').reshape([-1, 1]);
+    // Stack xs tensors
+    const xsTensor = tf.stack(xsArray);
+    // Create ys tensor
+    const ysTensor = tf.tensor1d(ysArray, 'float32').reshape([-1, 1]);
 
+    // Dispose individual xs tensors to free up memory
     xsArray.forEach(tensor => tensor.dispose());
 
-    const dataset = tf.data.zip({ xs: tf.data.array(xsArray), ys: tf.data.array(ysTensor) })
-    .shuffle(1000)
-    .batch(batchSize); 
-    
-    // let dataset = tf.data.array(dataSamples);
-
-    // dataset = dataset.map(sample => {
-    //     if (tf.any(tf.isNaN(sample.xs)).dataSync()[0]) {
-    //         console.log('Invalid input tensor:', sample);
-    //         return null;
-    //     }
-    //     if (tf.any(tf.isNaN(sample.ys)).dataSync()[0]) {
-    //         console.log('Invalid label tensor:', sample);
-    //         return null;
-    //     }
-    //     if (typeof sample.ys !== 'number' || isNaN(sample.ys)) {
-    //         console.log('Invalid label value:', sample.ys);
-    //         return null;
-    //     }
-    //     if (!sample.xs || (!sample.ys && sample.ys !== 0)) {
-    //         console.log('Invalid sample:', sample);
-    //         return null;
-    //     }
-    //     return {
-    //         xs: sample.xs,
-    //         ys: tf.tensor1d([sample.ys], 'float32')
-    //     }
-    // })
-    // .filter(sample => sample !== null);
-
-    // dataset = dataset.shuffle(1000).batch(batchSize);
+    // Create dataset from tensors
+    const dataset = tf.data
+        .datasetFromTensorSlices({ xs: xsTensor, ys: ysTensor })
+        .shuffle(1000)
+        .batch(batchSize);
 
     console.log('Data processing completed.');
-    return { dataset, totalSize: dataSamples.length };
+    return { dataset, totalSize: xsTensor.shape[0] };
 };
 
 // Handle image prediction
