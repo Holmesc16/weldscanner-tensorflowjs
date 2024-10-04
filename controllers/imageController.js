@@ -141,11 +141,28 @@ exports.createDataset = async (batchSize) => {
     let dataset = tf.data.array(dataSamples);
 
     dataset = dataset.map(sample => {
+        if (tf.any(tf.isNaN(sample.xs)).dataSync()[0]) {
+            console.log('Invalid input tensor:', sample);
+            return null;
+        }
+        if (tf.any(tf.isNaN(sample.ys)).dataSync()[0]) {
+            console.log('Invalid label tensor:', sample);
+            return null;
+        }
+        if (typeof sample.ys !== 'number' || isNaN(sample.ys)) {
+            console.log('Invalid label value:', sample.ys);
+            return null;
+        }
+        if (!sample.xs || (!sample.ys && sample.ys !== 0)) {
+            console.log('Invalid sample:', sample);
+            return null;
+        }
         return {
             xs: sample.xs,
             ys: tf.tensor1d([sample.ys], 'float32')
         }
     })
+    .filter(sample => sample !== null);
 
     dataset = dataset.shuffle(1000).batch(batchSize);
 
