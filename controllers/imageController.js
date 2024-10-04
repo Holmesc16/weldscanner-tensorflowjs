@@ -7,10 +7,9 @@ const async = require('async');
 const s3Client = new S3Client({ region: 'us-west-1' });
 const bucket = 'weldscanner';
 const categories = ['butt', 'saddle', 'electro'];
-const batchSize = 16;
-const numAugmentations = 5;
 const targetWidth = 150;
 const targetHeight = 150;
+const numAugmentations = 5;
 
 const streamToBuffer = (stream) => {
     const chunks = [];
@@ -60,7 +59,7 @@ const augmentImage = async (imageBuffer) => {
 };
 
 // Function to create dataset using tf.data API
-exports.createDataset = async () => {
+exports.createDataset = async (batchSize) => {
     console.log('Starting data processing...');
 
     // Helper function to get all image keys from S3
@@ -116,7 +115,7 @@ exports.createDataset = async () => {
             }
 
             const imgTensor = await processImage({ buffer: imgBuffer });
-            const ys = label;
+            const ys = tf.scalar(label, 'float32'); // Convert label to scalar tensor
 
             // Push the original image data
             dataQueue.push({ xs: imgTensor, ys });
@@ -174,8 +173,9 @@ exports.createDataset = async () => {
     // Batch and shuffle the dataset
     const batchedDataset = dataset.shuffle(1000).batch(batchSize);
 
-    const adjustedDataset = batchedDataset.map(({ xs, ys}) => {
-        ys = ys.reshape([-1])
+    const adjustedDataset = batchedDataset.map(({ xs, ys }) => {
+        ys = ys.reshape([-1]); // Reshape labels to [batch_size]
+        console.log('Adjusted ys shape:', ys.shape);
         return { xs, ys };
     });
 
