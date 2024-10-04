@@ -166,9 +166,13 @@ exports.createDataset = async () => {
         };
     });
 
+    const datasetSize = imageEntries.length * (numAugmentations + 1);
+    console.log(`Dataset size: ${datasetSize}`);
     // Batch and shuffle the dataset
     const batchedDataset = dataset.shuffle(1000).batch(batchSize);
 
+    batchedDataset.size = async () => datasetSize;
+    
     console.log('Data processing completed.');
     return batchedDataset;
 };

@@ -43,6 +43,8 @@ const objective = async (params) => {
     const valSize = Math.floor(totalSize * 0.2);
     const trainSize = totalSize - valSize;
 
+    console.log(`Total size: ${totalSize}, Validation size: ${valSize}, Training size: ${trainSize}`);  
+
     const trainDataset = dataGenerator.take(trainSize);
     const valDataset = dataGenerator.skip(trainSize);
 
@@ -63,6 +65,7 @@ const objective = async (params) => {
     model.add(tf.layers.dropout({ rate: 0.5 }));
     model.add(tf.layers.dense({ units: 1, activation: 'sigmoid' }));
 
+    console.log('Model summary:', model.summary());
     // Compile the model
     model.compile({
         optimizer: 'adam',
@@ -70,10 +73,12 @@ const objective = async (params) => {
         metrics: ['accuracy']
     });
 
+    console.log('Model compiled.');
     // Define early stopping callback
     const earlyStopping = tf.callbacks.earlyStopping({ monitor: 'val_loss', patience: 3 });
 
     try {
+        console.log('Starting model training...');
         // Train the model
         const history = await model.fitDataset(trainDataset, {
             epochs: 10,
@@ -90,6 +95,7 @@ const objective = async (params) => {
         console.error('Error during model training:', error);
         return -Infinity; // Return a very low score to indicate failure
     } finally {
+        console.log('Model training completed.');
         // Dispose of the model and variables to free up memory
         model.dispose();
         tf.disposeVariables();
@@ -99,16 +105,19 @@ const objective = async (params) => {
 // Function to run hyperparameter optimization
 const runHyperparameterOptimization = async () => {
     const hyperparameterCombinations = createHyperparameterCombinations(searchSpace);
+    console.log('Number of hyperparameter combinations:', hyperparameterCombinations.length);
     let bestScore = -Infinity;
     let bestParams = null;
 
     for (const params of hyperparameterCombinations) {
         try {
+            console.log('Evaluating parameters:', params);
             const score = await objective(params);
             if (score > bestScore) {
                 bestScore = score;
                 bestParams = params;
             }
+            console.log('Current best score:', bestScore);
         } catch (error) {
             console.error('Error evaluating parameters:', params, error);
         }
