@@ -1,10 +1,17 @@
+// hyperparameterOptimizer.js
+
 const tf = require('@tensorflow/tfjs-node');
 const { createDataset } = require('../controllers/imageController.js');
 
 // Define the search space for hyperparameters
 const searchSpace = {
-    filters: [32, 64],
-    kernelSize: [3, 5],
+    filters1: [16, 32],
+    filters2: [32, 64],
+    filters3: [64, 128],
+    kernelSize1: [3],
+    kernelSize2: [3],
+    kernelSize3: [3],
+    denseUnits: [16, 32],
     l2: [0.01, 0.001],
     batchSize: [16, 32]
 };
@@ -51,21 +58,48 @@ const objective = async (params) => {
     // Create the model with the current hyperparameters
     const model = tf.sequential();
 
+    // First Convolutional Block
     model.add(tf.layers.conv2d({
         inputShape: [150, 150, 3],
-        filters: params.filters,
-        kernelSize: params.kernelSize,
+        filters: params.filters1,
+        kernelSize: params.kernelSize1,
         activation: 'relu',
         kernelRegularizer: tf.regularizers.l2({ l2: params.l2 })
     }));
     model.add(tf.layers.batchNormalization());
     model.add(tf.layers.maxPooling2d({ poolSize: [2, 2] }));
-    model.add(tf.layers.flatten());
-    model.add(tf.layers.dense({ units: 128, activation: 'relu' }));
+
+    // Second Convolutional Block
+    model.add(tf.layers.conv2d({
+        filters: params.filters2,
+        kernelSize: params.kernelSize2,
+        activation: 'relu',
+        kernelRegularizer: tf.regularizers.l2({ l2: params.l2 })
+    }));
+    model.add(tf.layers.batchNormalization());
+    model.add(tf.layers.maxPooling2d({ poolSize: [2, 2] }));
+
+    // Third Convolutional Block
+    model.add(tf.layers.conv2d({
+        filters: params.filters3,
+        kernelSize: params.kernelSize3,
+        activation: 'relu',
+        kernelRegularizer: tf.regularizers.l2({ l2: params.l2 })
+    }));
+    model.add(tf.layers.batchNormalization());
+    model.add(tf.layers.maxPooling2d({ poolSize: [2, 2] }));
+
+    // Global Average Pooling instead of Flatten
+    model.add(tf.layers.globalAveragePooling2d());
+
+    // Dense Layers
+    model.add(tf.layers.dense({ units: params.denseUnits, activation: 'relu' }));
     model.add(tf.layers.dropout({ rate: 0.5 }));
     model.add(tf.layers.dense({ units: 1, activation: 'sigmoid' }));
 
-    console.log('Model summary:', model.summary());
+    console.log('Model summary:');
+    model.summary();
+
     // Compile the model
     model.compile({
         optimizer: 'adam',
@@ -98,7 +132,7 @@ const objective = async (params) => {
         console.log('Model training completed.');
         // Dispose of the model and variables to free up memory
         model.dispose();
-        tf.disposeVariables();
+        // tf.disposeVariables();
     }
 };
 

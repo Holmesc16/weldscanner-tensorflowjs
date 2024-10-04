@@ -19,11 +19,12 @@ const processImage = async (file) => {
             .toBuffer();
 
         const tensor = tf.tidy(() => {
-            return tf.node.decodeImage(resizedBuffer, 3)
+            const imgTensor = tf.node.decodeImage(resizedBuffer, 3)
                 .toFloat()
                 .div(255.0)
                 .sub(0.5)
                 .div(0.5);
+            return tf.keep(imgTensor); // Keep the tensor to prevent it from being disposed
         });
 
         return tensor;

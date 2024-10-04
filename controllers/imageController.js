@@ -20,7 +20,7 @@ const streamToBuffer = (stream) => {
     });
 };
 
-// Augments an image tensor with various transformations
+// Augment an image buffer with various transformations
 const augmentImage = async (imageBuffer) => {
     if (!imageBuffer || imageBuffer.length === 0) {
         throw new Error('Invalid image buffer');
@@ -28,28 +28,26 @@ const augmentImage = async (imageBuffer) => {
 
     try {
         let sharpImage = sharp(imageBuffer);
+
+        // Apply random transformations
         const rotation = Math.floor(Math.random() * 80 - 40);
         sharpImage = sharpImage.rotate(rotation);
 
-        if (Math.random() > 0.5) {
-            sharpImage = sharpImage.flip();
-        }
+        if (Math.random() > 0.5) sharpImage = sharpImage.flip();
+        if (Math.random() > 0.5) sharpImage = sharpImage.flop();
 
-        if (Math.random() > 0.5) {
-            sharpImage = sharpImage.flop();
-        }
-
+        // Resize the image
         sharpImage = sharpImage.resize(targetWidth, targetHeight);
 
+        // Convert to buffer
         const augmentedBuffer = await sharpImage.toBuffer();
 
-        const imgTensor = tf.tidy(() => {
-            return tf.node.decodeImage(augmentedBuffer, 3)
-                .toFloat()
-                .div(255.0)
-                .sub(0.5)
-                .div(0.5); // Shape: [height, width, channels]
-        });
+        // Decode image buffer to tensor
+        const imgTensor = tf.node.decodeImage(augmentedBuffer, 3)
+            .toFloat()
+            .div(255.0)
+            .sub(0.5)
+            .div(0.5); // Shape: [height, width, channels]
 
         return imgTensor;
     } catch (error) {
@@ -95,15 +93,14 @@ exports.createDataset = async (batchSize) => {
     // Shuffle the image entries to randomize the dataset
     tf.util.shuffle(imageEntries);
 
-    // Create a data queue to store processed data
-    const dataQueue = [];
-    let isProcessing = true;
+    // Create an array to store processed data
+    const dataSamples = [];
     let processingError = null;
 
-    // Set up the async queue with concurrency limit
-    const processingQueue = async.queue(async (task) => {
+    // Process images and augmentations
+    for (const entry of imageEntries) {
         try {
-            const { Key: imageKey, label } = task;
+            const { Key: imageKey, label } = entry;
 
             const getObjectParams = { Bucket: bucket, Key: imageKey };
             const imgData = await s3Client.send(new GetObjectCommand(getObjectParams));
@@ -111,79 +108,54 @@ exports.createDataset = async (batchSize) => {
 
             if (!imgBuffer || imgBuffer.length === 0) {
                 console.error(`Empty image buffer for S3 Key: ${imageKey}`);
-                return;
+                continue;
             }
 
+            // Process original image
             const imgTensor = await processImage({ buffer: imgBuffer });
-            const ys = tf.tensor1d([label], 'float32'); // Convert label to scalar tensor
-
-            // Push the original image data
-            dataQueue.push({ xs: imgTensor, ys });
+            dataSamples.push({ xs: imgTensor, ys: label });
 
             // Generate augmented images
             for (let i = 0; i < numAugmentations; i++) {
                 try {
                     const augmentedTensor = await augmentImage(imgBuffer);
-                    dataQueue.push({ xs: augmentedTensor, ys });
+                    dataSamples.push({ xs: augmentedTensor, ys: label });
                 } catch (error) {
                     console.error('Error during augmentation:', error);
                     continue;
                 }
             }
         } catch (error) {
-            console.error(`Error processing image from S3 Key: ${task.Key}`, error);
+            console.error(`Error processing image from S3 Key: ${entry.Key}`, error);
             processingError = error;
+            break; // Exit the loop if there's a critical error
         }
-    }, 15); // Set concurrency limit
+    }
 
-    // Enqueue all image entries
-    processingQueue.push(imageEntries);
+    if (processingError) {
+        throw processingError;
+    }
 
-    // When the queue is drained, set isProcessing to false
-    processingQueue.drain(() => {
-        isProcessing = false;
-    });
+    console.log(`Total samples after augmentation: ${dataSamples.length}`);
 
-    // Create a dataset using tf.data.generator
-    const dataset = tf.data.generator(() => {
-        return {
-            async next() {
-                // Wait for data to be available or processing to finish
-                while (dataQueue.length === 0) {
-                    if (!isProcessing) {
-                        if (processingError) {
-                            throw processingError;
-                        } else {
-                            return { done: true };
-                        }
-                    }
-                    // Wait a bit before checking again
-                    await new Promise(resolve => setTimeout(resolve, 100));
-                }
+    // Convert dataSamples to tensors
+    const xsArray = dataSamples.map(sample => sample.xs);
+    const ysArray = dataSamples.map(sample => sample.ys);
 
-                const data = dataQueue.shift();
-                return { value: data, done: false };
-            }
-        };
-    });
+    // Stack tensors
+    const xsTensor = tf.stack(xsArray);
+    const ysTensor = tf.tensor1d(ysArray, 'float32').reshape([-1, 1]);
 
-    const datasetSize = imageEntries.length * (numAugmentations + 1);
-    console.log(`Dataset size: ${datasetSize}`);
+    // Dispose individual tensors to free up memory
+    xsArray.forEach(tensor => tensor.dispose());
 
-    // Batch and shuffle the dataset
-    const batchedDataset = dataset.shuffle(1000).batch(batchSize);
-
-    const adjustedDataset = batchedDataset.map(({ xs, ys }) => {
-        ys = ys.reshape([-1, 1]); // reshape labels to [batch_size, 1]
-        ys = ys.cast('float32'); // ensure labels are float32
-        console.log('Adjusted ys shape:', ys.shape);
-        return { xs, ys };
-    });
-
-    adjustedDataset.size = async () => datasetSize;
+    // Create a TensorFlow.js dataset
+    const dataset = tf.data.array({ xs: xsTensor, ys: ysTensor })
+        .shuffle(1000)
+        .batch(batchSize);
 
     console.log('Data processing completed.');
-    return adjustedDataset;
+    return dataset;
 };
 
 // Handle image prediction
@@ -196,7 +168,7 @@ exports.handleImage = async (req, res) => {
             return res.status(400).json({ error: 'Invalid image data' });
         }
 
-        const prediction = await tfModel.predict(img);
+        const prediction = await tfModel.predict(img.expandDims(0)); // Add batch dimension
         const predictionValue = prediction.dataSync()[0];
         const result = predictionValue > 0.5 ? 'Pass' : 'Fail';
 
