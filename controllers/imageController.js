@@ -12,13 +12,6 @@ const numAugmentations = 5;
 const targetWidth = 150;
 const targetHeight = 150;
 
-// Initialize TensorFlow.js backend
-(async () => {
-    await tf.setBackend('tensorflow');
-    await tf.ready();
-    console.log('TensorFlow backend set to TensorFlow.js');
-})();
-
 const streamToBuffer = (stream) => {
     const chunks = [];
     return new Promise((resolve, reject) => {

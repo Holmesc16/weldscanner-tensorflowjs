@@ -6,6 +6,8 @@ const { createDataset } = require('../controllers/imageController.js');
 const runHyperparameterOptimization = require('../utils/hyperparameterOptimizer.js');
 
 const trainModel = async () => {
+    await tf.ready();
+    
     console.log('Starting hyperparameter optimization...');
     const bestParams = await runHyperparameterOptimization();
     console.log('Best hyperparameters:', bestParams);
