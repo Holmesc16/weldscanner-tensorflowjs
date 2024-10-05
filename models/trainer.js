@@ -67,8 +67,14 @@ const trainModel = async () => {
         // Compile the model
         model.compile({
             optimizer: 'adam',
-            loss: 'binaryCrossentropy',
-            metrics: ['accuracy']
+            loss: (yTrue, yPred) => {
+                const loss = tf.losses.sigmoidCrossEntropy(yTrue, yPred);
+                loss.data().then(value => {
+                    console.log('Batch loss:', value);
+                });
+                return loss;
+            },
+            // metrics: ['accuracy']
         });
 
         // Define callbacks
@@ -87,8 +93,8 @@ const trainModel = async () => {
         // Train the model using the dataset
         await model.fitDataset(dataGenerator, {
             epochs: 10, // Adjust as needed
-            validationSplit: 0.2, // Splits the data into 80% training and 20% validation
-            callbacks: callbacks
+            validationData: 0.2,
+            // callbacks: callbacks
         });
 
         // Save the model

@@ -103,8 +103,14 @@ const objective = async (params) => {
     // Compile the model
     model.compile({
         optimizer: 'adam',
-        loss: 'binaryCrossentropy',
-        metrics: ['accuracy']
+        loss: ((yTrue, yPred) => {
+            const loss = tf.losses.sigmoidCrossEntropy(yTrue, yPred);
+            loss.data().then(value => {
+                console.log('Batch loss:', value);
+            });
+            return loss;
+        },)
+        // metrics: ['accuracy']
     });
 
     console.log('Model compiled.');
@@ -117,7 +123,6 @@ const objective = async (params) => {
         const history = await model.fitDataset(trainDataset, {
             epochs: 10,
             validationData: valDataset,
-            callbacks: [earlyStopping]
         });
 
         // Get the final validation accuracy
