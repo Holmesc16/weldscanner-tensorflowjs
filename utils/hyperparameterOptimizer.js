@@ -109,7 +109,7 @@ const objective = async (params) => {
                 console.log('Batch loss:', value);
             });
             return loss;
-        },)
+        }),
         // metrics: ['accuracy']
     });
 
