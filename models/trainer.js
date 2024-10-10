@@ -68,14 +68,17 @@ const trainModel = async () => {
         model.compile({
             optimizer: 'adam',
             loss: (yTrue, yPred) => {
-                const loss = tf.losses.sigmoidCrossEntropy(yTrue, yPred);
-                // Ensure loss is a tensor before accessing dataSync
-                if (loss instanceof tf.Tensor) {
-                    loss.dataSync().forEach(value => {
-                        console.log('Batch loss:', value);
-                    });
+                try {
+                    const loss = tf.losses.sigmoidCrossEntropy(yTrue, yPred);
+                    if (loss instanceof tf.Tensor) {
+                        const lossValues = loss.dataSync();
+                        console.log('Batch loss:', lossValues);
+                    }
+                    return loss;
+                } catch (error) {
+                    console.error('Error calculating loss:', error);
+                    throw error; // Re-throw to ensure the error is not silently ignored
                 }
-                return loss;
             },
             // metrics: ['accuracy']
         });
@@ -94,17 +97,26 @@ const trainModel = async () => {
         testOutput.dispose();
 
         // Train the model using the dataset
-        await model.fitDataset(dataGenerator, {
-            epochs: 10, // Adjust as needed
-            validationData: 0.2,
-            // callbacks: callbacks
-        });
-
+        try {
+            await model.fitDataset(dataGenerator, {
+                epochs: 10, // Adjust as needed
+                validationData: 0.2,
+                // callbacks: callbacks
+            });
+            console.log('Training completed successfully.');
+        } catch (error) {
+            console.error('Error during model training:', error);
+            throw error; // Re-throw to ensure the error is not silently ignored
+        }
         // Save the model
-        const modelPath = path.join(__dirname, '..', 'trained_models', 'weldscanner_quality_model');
-        await model.save(`file://${modelPath}`);
-        console.log('Model trained and saved.');
-
+        try {
+            const modelPath = path.join(__dirname, '..', 'trained_models', 'weldscanner_quality_model');
+            await model.save(`file://${modelPath}`);
+            console.log('Model trained and saved.');
+        } catch (error) {
+            console.error('Error saving model:', error);
+            throw error; // Re-throw to ensure the error is not silently ignored
+        }
         // Dispose the model to free up memory
         model.dispose();
     } catch (err) {

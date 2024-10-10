@@ -104,14 +104,17 @@ const objective = async (params) => {
     model.compile({
         optimizer: 'adam',
         loss: (yTrue, yPred) => {
-            const loss = tf.losses.sigmoidCrossEntropy(yTrue, yPred);
-            // Ensure loss is a tensor before accessing dataSync
-            if (loss instanceof tf.Tensor) {
-                loss.dataSync().forEach(value => {
-                    console.log('Batch loss:', value);
-                });
+            try {
+                const loss = tf.losses.sigmoidCrossEntropy(yTrue, yPred);
+                if (loss instanceof tf.Tensor) {
+                    const lossValues = loss.dataSync();
+                    console.log('Batch loss:', lossValues);
+                }
+                return loss;
+            } catch (error) {
+                console.error('Error calculating loss:', error);
+                throw error; // Re-throw to ensure the error is not silently ignored
             }
-            return loss;
         },
         // metrics: ['accuracy']
     });
