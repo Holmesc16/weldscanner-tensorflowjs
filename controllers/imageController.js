@@ -21,7 +21,6 @@ const streamToBuffer = (stream) => {
     });
 };
 
-// Augment an image buffer with various transformations
 const augmentImage = async (imageBuffer) => {
     if (!imageBuffer || imageBuffer.length === 0) {
         throw new Error('Invalid image buffer');
@@ -37,8 +36,8 @@ const augmentImage = async (imageBuffer) => {
         if (Math.random() > 0.5) sharpImage = sharpImage.flip();
         if (Math.random() > 0.5) sharpImage = sharpImage.flop();
 
-        // Resize the image
-        sharpImage = sharpImage.resize(targetWidth, targetHeight);
+        // Resize the image to 224x224
+        sharpImage = sharpImage.resize(224, 224);
 
         // Convert to buffer
         const augmentedBuffer = await sharpImage.toBuffer();
@@ -46,9 +45,7 @@ const augmentImage = async (imageBuffer) => {
         // Decode image buffer to tensor
         const imgTensor = tf.node.decodeImage(augmentedBuffer, 3)
             .toFloat()
-            .div(255.0)
-            .sub(0.5)
-            .div(0.5); // Shape: [height, width, channels]
+            .div(255.0); // Normalize to [0, 1]
 
         return imgTensor;
     } catch (error) {

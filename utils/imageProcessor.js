@@ -1,9 +1,7 @@
-// utils/imageProcessor.js
-
 const tf = require('@tensorflow/tfjs-node');
 const sharp = require('sharp');
 
-const targetWidth = 224; // Update to match MobileNet input size
+const targetWidth = 224;
 const targetHeight = 224;
 
 const processImage = async (file) => {
