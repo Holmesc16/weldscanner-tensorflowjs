@@ -69,9 +69,12 @@ const trainModel = async () => {
             optimizer: 'adam',
             loss: (yTrue, yPred) => {
                 const loss = tf.losses.sigmoidCrossEntropy(yTrue, yPred);
-                loss.dataSync().forEach(value => {
-                    console.log('Batch loss:', value);
-                });
+                // Ensure loss is a tensor before accessing dataSync
+                if (loss instanceof tf.Tensor) {
+                    loss.dataSync().forEach(value => {
+                        console.log('Batch loss:', value);
+                    });
+                }
                 return loss;
             },
             // metrics: ['accuracy']
