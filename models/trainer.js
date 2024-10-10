@@ -37,7 +37,7 @@ async function trainModel() {
 
     await model.fitDataset(dataset, {
         epochs: 10,
-        validationSplit: 0.2,
+        validationData: 0.2,
         callbacks: tf.callbacks.earlyStopping({ monitor: 'val_loss', patience: 5 })
     });
 
