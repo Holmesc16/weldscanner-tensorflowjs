@@ -58,6 +58,7 @@ const augmentImage = async (imageBuffer) => {
 };
 
 // Function to create dataset using tf.data API
+
 exports.createDataset = async (batchSize) => {
     console.log('Starting data processing...');
 
@@ -81,7 +82,6 @@ exports.createDataset = async (batchSize) => {
                 imageEntries.push(...entries);
             }
         }
-
         return imageEntries;
     };
 
@@ -91,10 +91,8 @@ exports.createDataset = async (batchSize) => {
         throw new Error('No valid data to process. Ensure that images are available in S3.');
     }
 
-    // Shuffle the image entries to randomize the dataset
     tf.util.shuffle(imageEntries);
 
-    // Create an array to store processed data
     const dataSamples = [];
     let processingError = null;
 
@@ -124,7 +122,7 @@ exports.createDataset = async (batchSize) => {
             for (let i = 0; i < numAugmentations; i++) {
                 try {
                     const augmentedTensor = await augmentImage(imgBuffer);
-                    if (!augmentedTensor) {
+                    if (!augmentedTensor || augmentedTensor.shape.length !== 3) {
                         console.error(`Invalid augmented image tensor for S3 Key: ${imageKey}`);
                         continue;
                     }

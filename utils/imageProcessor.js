@@ -3,8 +3,8 @@
 const tf = require('@tensorflow/tfjs-node');
 const sharp = require('sharp');
 
-const targetWidth = 150;
-const targetHeight = 150;
+const targetWidth = 224; // Update to match MobileNet input size
+const targetHeight = 224;
 
 const processImage = async (file) => {
     try {
@@ -15,15 +15,11 @@ const processImage = async (file) => {
 
         const resizedBuffer = await sharp(file.buffer)
             .resize(targetWidth, targetHeight)
-            .toFormat('jpeg')
             .toBuffer();
 
-        
         const imgTensor = tf.node.decodeImage(resizedBuffer, 3)
             .toFloat()
-            .div(255.0)
-            .sub(0.5)
-            .div(0.5);
+            .div(255.0); // Normalize to [0, 1]
 
         return imgTensor;
     }

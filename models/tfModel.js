@@ -1,17 +1,19 @@
 const tf = require('@tensorflow/tfjs-node');
-const path = require('path');
 
-const modelPath = path.join(__dirname, '..', 'trained_models', 'weldscanner_quality_model', 'model.json');
 let model;
 
-const loadModel = async () => {
+async function loadModel() {
     if (!model) {
-        model = await tf.loadLayersModel(`file://${modelPath}`);
+        model = await tf.loadLayersModel('file://path/to/your/saved/model/model.json');
     }
     return model;
 }
 
-exports.predict = async (tensor) => {
-    const loadedModel = await loadModel();
-    return loadedModel.predict(tensor);
+async function predict(inputTensor) {
+    const model = await loadModel();
+    return model.predict(inputTensor);
+}
+
+module.exports = {
+    predict
 };
