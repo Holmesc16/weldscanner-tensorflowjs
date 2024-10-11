@@ -19,6 +19,11 @@ const processImage = async (file) => {
             .toFloat()
             .div(255.0); // Normalize to [0, 1]
 
+        if (tf.any(tf.isNaN(imgTensor)).dataSync()[0]) {
+            console.error('NaN value detected in image tensor');
+            return null;
+        }
+        
         if (imgTensor.shape.length !== 3 || imgTensor.shape[2] !== 3) {
             console.error('Invalid image tensor shape:', imgTensor.shape);
             return null;

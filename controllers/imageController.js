@@ -30,7 +30,7 @@ const augmentImage = async (imageBuffer) => {
         let sharpImage = sharp(imageBuffer);
 
         // Apply random transformations
-        const rotation = Math.floor(Math.random() * 80 - 40);
+        const rotation = Math.floor(Math.random() * 40 - 40);
         sharpImage = sharpImage.rotate(rotation);
 
         if (Math.random() > 0.5) sharpImage = sharpImage.flip();
@@ -47,6 +47,10 @@ const augmentImage = async (imageBuffer) => {
             .toFloat()
             .div(255.0); // Normalize to [0, 1]
 
+        if (tf.any(tf.isNaN(imgTensor)).dataSync()[0]) {
+            console.error('NaN value detected in augmented image tensor');
+            return null;
+        }
         console.log(`Augmented image tensor shape: ${imgTensor.shape}`);
         return imgTensor;
     } catch (error) {
@@ -139,7 +143,10 @@ exports.createDataset = async (batchSize) => {
     
     const validDataSamples = dataSamples.filter(sample => {
         if (!sample.xs || !sample.ys) {
-            console.error('Invalid sample detected, skipping...');
+            console.error('Invalid sample detected, skipping...', {
+                xs: sample.xs,
+                ys: sample.ys
+            });
             return false;
         }
         return true;
