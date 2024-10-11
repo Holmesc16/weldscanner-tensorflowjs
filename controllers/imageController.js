@@ -203,8 +203,8 @@ exports.createDataset = async (batchSize) => {
         return tf.data.array(samples).map(sample => {
             return {
                 xs: {
-                    image: sample.xs.image,
-                    category: sample.xs.category
+                    imageInput: sample.xs.image,
+                    categoryInput: sample.xs.category
                 },
                 ys: sample.ys
             }
