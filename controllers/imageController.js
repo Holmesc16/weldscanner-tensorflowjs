@@ -119,7 +119,7 @@ exports.createDataset = async (batchSize) => {
                 continue;
             }
 
-            const categoryEncoding = tf.oneHot(categoryIndex, categories.length).arraySync();
+            const categoryEncoding = tf.oneHot(categoryIndex, categories.length);
 
             const getObjectParams = { Bucket: bucket, Key: imageKey };
             const imgData = await s3Client.send(new GetObjectCommand(getObjectParams));
@@ -136,8 +136,10 @@ exports.createDataset = async (batchSize) => {
                 continue;
             }
 
-            const categoryTensor = tf.tensor1d(categoryEncoding, 'float32');
-            dataSamples.push({ xs: imgTensor, ys: categoryTensor });
+            const categoryTensor = tf.tensor1d(categoryEncoding, categories.length);
+
+            const labelTensor = tf.tensor1d([label], 'float32');
+            dataSamples.push({ xs: { image: imgTensor, category: categoryTensor }, ys: labelTensor });
 
             for (let i = 0; i < numAugmentations; i++) {
                 try {
@@ -146,7 +148,7 @@ exports.createDataset = async (batchSize) => {
                         console.error(`Invalid augmented image tensor for S3 Key: ${imageKey}`);
                         continue;
                     }
-                    dataSamples.push({ xs: { augmented: augmentedTensor }, ys: categoryTensor });
+                    dataSamples.push({ xs: { image: augmentedTensor, category: categoryTensor }, ys: labelTensor });
                 } catch (error) {
                     console.error('Error during augmentation:', error);
                     continue;
@@ -199,10 +201,11 @@ exports.createDataset = async (batchSize) => {
                     image: sample.xs.image,
                     category: sample.xs.category
                 },
-                ys: tf.tensor1d([sample.ys], 'float32')
+                ys: sample.ys
             }
         }).batch(batchSize);
-    }
+    };
+    
     // Create datasets from the samples
     let trainDataset = createDatasetFromSamples(trainDataSamples);
     let valDataset = createDatasetFromSamples(valDataSamples);
