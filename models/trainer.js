@@ -30,15 +30,18 @@ async function createModel() {
     let x = concatenated;
     x = tf.layers.dense({ units: 128, activation: 'relu' }).apply(x);
     x = tf.layers.dropout({ rate: 0.5 }).apply(x);
+
     const output = tf.layers.dense({ units: 1, activation: 'sigmoid' }).apply(x);
-    
-    const model = tf.model({ inputs: [imageInput, categoryInput], outputs: output });
+    const outputReshaped = tf.layers.reshape({ targetShape: [1] }).apply(output);
+
+    const model = tf.model({ inputs: [imageInput, categoryInput], outputs: outputReshaped });
+    console.log(model.summary());
 
     model.compile({
         optimizer: tf.train.adam(),
         loss: 'binaryCrossentropy',
         metrics: ['accuracy']
-    })
+    });
 
     return model;
 }
