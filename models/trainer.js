@@ -43,7 +43,7 @@ async function trainModel() {
         callbacks: tf.callbacks.earlyStopping({ monitor: 'val_loss', patience: 5 })
     });
 
-    const modelPath = path.join(__dirname, '..', 'trained_models', 'weldscanner_quality_model');
+    const modelPath = path.join(__dirname, '..', '_trained_models', 'weldscanner_quality_model');
     await model.save(`file://${modelPath}`);
     console.log('Model trained and saved.');
 }
