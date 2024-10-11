@@ -19,13 +19,15 @@ async function createModel() {
     const imageInput = tf.input({ shape: [224, 224, 3], name: 'imageInput' });
     const baseModelOutput = baseModel.apply(imageInput);
 
+    const baseModelFlattened = tf.layers.flatten().apply(baseModelOutput);
+
     const categoryInput = tf.input({ shape: [3], name: 'categoryInput' });
     
     const categoryDense = tf.layers.dense({ units: 32, activation: 'relu', name: 'categoryDense' }).apply(categoryInput);
 
-    const concatenated = tf.layers.concatenate().apply([baseModelOutput, categoryDense]);
+    const concatenated = tf.layers.concatenate().apply([baseModelFlattened, categoryDense]);
 
-    let x = tf.layers.flatten().apply(concatenated);
+    let x = concatenated;
     x = tf.layers.dense({ units: 128, activation: 'relu' }).apply(x);
     x = tf.layers.dropout({ rate: 0.5 }).apply(x);
     const output = tf.layers.dense({ units: 1, activation: 'sigmoid' }).apply(x);
