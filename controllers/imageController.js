@@ -66,9 +66,13 @@ exports.createDataset = async (batchSize) => {
     const getAllImageKeys = async () => {
         const imageEntries = [];
         for (const category of categories) {
+            console.log(`Processing category: ${category}`);
             for (const labelName of ['pass', 'fail']) {
+                console.log(`Processing label: ${labelName}, type: ${typeof labelName}`);
                 const label = labelName === 'pass' ? 1 : 0;
+                console.log(`Label evaluated: ${label}, type: ${typeof label}`);
                 const folderPath = `${category}/${labelName}`;
+                console.log(`Folder path: ${folderPath}`);
                 const params = { Bucket: bucket, Prefix: folderPath };
                 const data = await s3Client.send(new ListObjectsV2Command(params));
 
@@ -107,6 +111,7 @@ exports.createDataset = async (batchSize) => {
             const categoryMatch = imageKey.match(/^([^/]+)/);
             const category = categoryMatch ? categoryMatch[1] : null;
 
+            console.log(`Category extracted: ${category}`);
 
             if (!category) {
                 console.error(`Invalid image key: ${imageKey}`);
@@ -138,7 +143,7 @@ exports.createDataset = async (batchSize) => {
 
             const categoryTensor = tf.tensor1d(categoryEncoding, categories.length);
 
-            const labelTensor = tf.tensor1d([label], 'float32');
+            const labelTensor = tf.scalar(Number(label), 'float32');
             dataSamples.push({ xs: { image: imgTensor, category: categoryTensor }, ys: labelTensor });
 
             for (let i = 0; i < numAugmentations; i++) {
@@ -205,7 +210,7 @@ exports.createDataset = async (batchSize) => {
             }
         }).batch(batchSize);
     };
-    
+
     // Create datasets from the samples
     let trainDataset = createDatasetFromSamples(trainDataSamples);
     let valDataset = createDatasetFromSamples(valDataSamples);
