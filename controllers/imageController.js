@@ -59,10 +59,8 @@ const augmentImage = async (imageBuffer) => {
 exports.createDataset = async (batchSize) => {
     console.log('Starting data processing...');
 
-    // Helper function to get all image keys from S3
     const getAllImageKeys = async () => {
         const imageEntries = [];
-
         for (const category of categories) {
             for (const labelName of ['pass', 'fail']) {
                 const label = labelName === 'pass' ? 1 : 0;
@@ -109,13 +107,12 @@ exports.createDataset = async (batchSize) => {
 
             // Process original image
             const imgTensor = await processImage({ buffer: imgBuffer });
-            if (!imgTensor) {
+            if (!imgTensor || imgTensor.shape.length !== 3) {
                 console.error(`Invalid image tensor for S3 Key: ${imageKey}`);
                 continue;
             }
             dataSamples.push({ xs: imgTensor, ys: label });
 
-            // Generate augmented images
             for (let i = 0; i < numAugmentations; i++) {
                 try {
                     const augmentedTensor = await augmentImage(imgBuffer);
@@ -145,17 +142,16 @@ exports.createDataset = async (batchSize) => {
     // Create dataset from dataSamples
     let dataset = tf.data.array(dataSamples);
 
-    // Map over the dataset to ensure labels are tensors
     dataset = dataset.map(sample => {
+        if (!sample.xs || !sample.ys) {
+            console.error('Invalid sample detected, skipping...');
+            return null;
+        }
         return {
             xs: sample.xs,
-            ys: tf.tensor1d([sample.ys], 'float32') // Shape: [1]
+            ys: tf.tensor1d([sample.ys], 'float32')
         };
-    })
-    .filter(sample => {
-        console.log(`Sample is null: ${sample === null}`);
-        return sample !== null;
-    });
+    }).filter(sample => sample !== null);
 
     // Shuffle and batch the dataset
     dataset = dataset.shuffle(1000).batch(batchSize);
