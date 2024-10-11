@@ -47,15 +47,15 @@ const augmentImage = async (imageBuffer) => {
             .toFloat()
             .div(255.0); // Normalize to [0, 1]
 
+        console.log(`Augmented image tensor shape: ${imgTensor.shape}`);
         return imgTensor;
     } catch (error) {
         console.error('Error augmenting image:', error.message);
-        throw error;
+        return null;
     }
 };
 
 // Function to create dataset using tf.data API
-
 exports.createDataset = async (batchSize) => {
     console.log('Starting data processing...');
 
@@ -91,11 +91,9 @@ exports.createDataset = async (batchSize) => {
     const dataSamples = [];
     let processingError = null;
 
-    // Process images and augmentations
     for (const entry of imageEntries) {
         try {
             const { Key: imageKey, label } = entry;
-
             const getObjectParams = { Bucket: bucket, Key: imageKey };
             const imgData = await s3Client.send(new GetObjectCommand(getObjectParams));
             const imgBuffer = await streamToBuffer(imgData.Body);
@@ -105,7 +103,6 @@ exports.createDataset = async (batchSize) => {
                 continue;
             }
 
-            // Process original image
             const imgTensor = await processImage({ buffer: imgBuffer });
             if (!imgTensor || imgTensor.shape.length !== 3) {
                 console.error(`Invalid image tensor for S3 Key: ${imageKey}`);
@@ -139,22 +136,25 @@ exports.createDataset = async (batchSize) => {
 
     console.log(`Total samples after augmentation: ${dataSamples.length}`);
 
-    // Create dataset from dataSamples
-    let dataset = tf.data.array(dataSamples);
-
-    dataset = dataset.map(sample => {
+    
+    const validDataSamples = dataSamples.filter(sample => {
         if (!sample.xs || !sample.ys) {
             console.error('Invalid sample detected, skipping...');
-            return null;
+            return false;
         }
+        return true;
+    })
+
+    let dataset = tf.data.array(validDataSamples);
+
+    dataset = dataset.map(sample => {
         return {
             xs: sample.xs,
-            ys: tf.tensor1d([sample.ys], 'float32')
-        };
-    }).filter(sample => sample !== null);
+            ys: tf.tensor(sample.ys, 'float32')
+        }
+    });
 
-    // Shuffle and batch the dataset
-    dataset = dataset.shuffle(1000).batch(batchSize);
+    // dataset = dataset.shuffle(1000).batch(batchSize);
 
     console.log('Data processing completed.');
     return { dataset, totalSize: dataSamples.length };

@@ -35,9 +35,33 @@ async function trainModel() {
     const model = await createModel();
     const { dataset, totalSize } = await createDataset(16);
 
-    await model.fitDataset(dataset, {
+    const totalBatches = await dataset.cardinality().then(num => num)
+    const valBatches = Math.floor(totalBatches * 0.2)
+    const trainBatches = totalBatches - valBatches;
+
+    const valDataset = dataset.take(valBatches);
+    const trainDataset = dataset.skip(valBatches);
+
+    const shuffledTrainDataset = trainDataset.shuffle(1000).batch(16);
+    const batchedValDataset = valDataset.batch(16);
+
+    await shuffledTrainDataset.forEachAsync(sample => {
+        if (!sample.xs || !sample.ys) {
+            console.error('Invalid sample detected, skipping...');
+        }
+        console.log('shuffled training dataset: ', sample.xs.shape, sample.ys.shape);
+    });
+
+    await batchedValDataset.forEachAsync(sample => {
+        if (!sample.xs || !sample.ys) {
+            console.error('Invalid sample detected, skipping...');
+        }
+        console.log('batched validation dataset: ', sample.xs.shape, sample.ys.shape);
+    });
+    
+    await model.fitDataset(shuffledTrainDataset, {
         epochs: 10,
-        validationData: 0.2,
+        validationData: batchedValDataset,
         callbacks: tf.callbacks.earlyStopping({ monitor: 'val_loss', patience: 5 })
     });
 

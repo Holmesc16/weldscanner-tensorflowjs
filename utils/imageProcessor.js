@@ -1,7 +1,7 @@
 const tf = require('@tensorflow/tfjs-node');
 const sharp = require('sharp');
 
-const targetWidth = 224;
+const targetWidth = 224; // Update to match MobileNet input size
 const targetHeight = 224;
 
 const processImage = async (file) => {
@@ -19,15 +19,11 @@ const processImage = async (file) => {
             .toFloat()
             .div(255.0); // Normalize to [0, 1]
 
+        console.log(`Processed image tensor shape: ${imgTensor.shape}`);
         return imgTensor;
-    }
-    catch (error) {
+    } catch (error) {
         console.error('Error processing image:', error.message);
         return null;
-    } finally {
-        if (file.buffer) {
-            file.buffer = null;
-        }
     }
 };
 
