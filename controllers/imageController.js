@@ -151,6 +151,10 @@ exports.createDataset = async (batchSize) => {
             xs: sample.xs,
             ys: tf.tensor1d([sample.ys], 'float32') // Shape: [1]
         };
+    })
+    .filter(sample => {
+        console.log(`Sample is null: ${sample === null}`);
+        return sample !== null;
     });
 
     // Shuffle and batch the dataset
