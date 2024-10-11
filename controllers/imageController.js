@@ -141,7 +141,7 @@ exports.createDataset = async (batchSize) => {
                 continue;
             }
 
-            const categoryTensor = tf.tensor1d(categoryEncoding, categories.length);
+            const categoryTensor = tf.oneHot(categoryIndex, categories.length);
 
             const labelTensor = tf.scalar(Number(label), 'float32');
             dataSamples.push({ xs: { image: imgTensor, category: categoryTensor }, ys: labelTensor });
