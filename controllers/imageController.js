@@ -105,7 +105,7 @@ exports.createDataset = async (batchSize) => {
 
             const imgTensor = await processImage({ buffer: imgBuffer });
             if (!imgTensor || imgTensor.shape.length !== 3) {
-                console.error(`Invalid image tensor for S3 Key: ${imageKey}`);
+                console.error(`Invalid image tensor for S3 Key: ${imageKey}, shape: ${imgTensor ? imgTensor.shape : 'undefined'}`);
                 continue;
             }
             dataSamples.push({ xs: imgTensor, ys: label });
@@ -143,21 +143,40 @@ exports.createDataset = async (batchSize) => {
             return false;
         }
         return true;
-    })
-
-    let dataset = tf.data.array(validDataSamples);
-
-    dataset = dataset.map(sample => {
-        return {
-            xs: sample.xs,
-            ys: tf.tensor(sample.ys, 'float32')
-        }
     });
 
-    // dataset = dataset.shuffle(1000).batch(batchSize);
+    if (validDataSamples.length === 0) {
+        throw new Error('No valid samples available for training.');
+    }
+
+    // Shuffle the data
+    tf.util.shuffle(validDataSamples);
+
+    // Split data into training and validation sets
+    const totalSamples = validDataSamples.length;
+    const valSize = Math.floor(totalSamples * 0.2);
+    const trainSize = totalSamples - valSize;
+
+    const valDataSamples = validDataSamples.slice(0, valSize);
+    const trainDataSamples = validDataSamples.slice(valSize);
+
+    // Create datasets from the samples
+    let trainDataset = tf.data.array(trainDataSamples).map(sample => {
+        return {
+            xs: sample.xs,
+            ys: tf.tensor1d([sample.ys], 'float32')
+        };
+    }).shuffle(1000).batch(batchSize);
+
+    let valDataset = tf.data.array(valDataSamples).map(sample => {
+        return {
+            xs: sample.xs,
+            ys: tf.tensor1d([sample.ys], 'float32')
+        };
+    }).batch(batchSize);
 
     console.log('Data processing completed.');
-    return { dataset, totalSize: dataSamples.length };
+    return { trainDataset, valDataset, totalSize: totalSamples };
 };
 
 // Handle image prediction

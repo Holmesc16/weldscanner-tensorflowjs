@@ -19,6 +19,11 @@ const processImage = async (file) => {
             .toFloat()
             .div(255.0); // Normalize to [0, 1]
 
+        if (imgTensor.shape.length !== 3 || imgTensor.shape[2] !== 3) {
+            console.error('Invalid image tensor shape:', imgTensor.shape);
+            return null;
+        }
+
         console.log(`Processed image tensor shape: ${imgTensor.shape}`);
         return imgTensor;
     } catch (error) {

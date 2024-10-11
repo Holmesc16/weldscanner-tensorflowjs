@@ -1,4 +1,5 @@
-const tf = require('@tensorflow/tfjs-node');
+const tf = require('@tensorflow/tfjs');
+require('@tensorflow/tfjs-node');
 const path = require('path');
 const { createDataset } = require('../controllers/imageController.js');
 
@@ -33,35 +34,12 @@ async function createModel() {
 
 async function trainModel() {
     const model = await createModel();
-    const { dataset, totalSize } = await createDataset(16);
+    const { trainDataset, valDataset, totalSize } = await createDataset(16);
 
-    const totalBatches = await dataset.cardinality().then(num => num)
-    const valBatches = Math.floor(totalBatches * 0.2)
-    const trainBatches = totalBatches - valBatches;
-
-    const valDataset = dataset.take(valBatches);
-    const trainDataset = dataset.skip(valBatches);
-
-    const shuffledTrainDataset = trainDataset.shuffle(1000).batch(16);
-    const batchedValDataset = valDataset.batch(16);
-
-    await shuffledTrainDataset.forEachAsync(sample => {
-        if (!sample.xs || !sample.ys) {
-            console.error('Invalid sample detected, skipping...');
-        }
-        console.log('shuffled training dataset: ', sample.xs.shape, sample.ys.shape);
-    });
-
-    await batchedValDataset.forEachAsync(sample => {
-        if (!sample.xs || !sample.ys) {
-            console.error('Invalid sample detected, skipping...');
-        }
-        console.log('batched validation dataset: ', sample.xs.shape, sample.ys.shape);
-    });
-    
-    await model.fitDataset(shuffledTrainDataset, {
+    // Train the model using the datasets
+    await model.fitDataset(trainDataset, {
         epochs: 10,
-        validationData: batchedValDataset,
+        validationData: valDataset,
         callbacks: tf.callbacks.earlyStopping({ monitor: 'val_loss', patience: 5 })
     });
 
