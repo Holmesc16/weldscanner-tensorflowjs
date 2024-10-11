@@ -206,7 +206,7 @@ exports.createDataset = async (batchSize) => {
                     imageInput: sample.xs.image,
                     categoryInput: sample.xs.category
                 },
-                ys: sample.ys
+                ys: sample.ys.as1D()
             }
         }).batch(batchSize);
     };

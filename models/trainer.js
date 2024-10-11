@@ -46,6 +46,17 @@ async function createModel() {
     return model;
 }
 
+const printShapes = {
+    onBatchEnd: (batch, logs) => {
+        const xsBatch = batch.xs;
+        const ysBatch = xsBatch.map(({ xs, ys }) => ys);
+
+        ysBatch.forEach(async (ysTensor) => {
+            console.log(`Batch label shape: ${ysTensor.shape || 'unknown'}`);
+        });
+    }
+ }
+
 async function trainModel() {
     const model = await createModel();
     const { trainDataset, valDataset, totalSize } = await createDataset(16);
@@ -54,7 +65,7 @@ async function trainModel() {
     await model.fitDataset(trainDataset, {
         epochs: 10,
         validationData: valDataset,
-        callbacks: tf.callbacks.earlyStopping({ monitor: 'val_loss', patience: 5 })
+        callbacks: [tf.callbacks.earlyStopping({ monitor: 'val_loss', patience: 5 }), printShapes]
     });
 
     const modelPath = path.join(__dirname, '..', '_trained_models', 'weldscanner_quality_model_v2');
