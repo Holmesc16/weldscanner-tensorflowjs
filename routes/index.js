@@ -1,14 +1,14 @@
 const express = require('express');
 const multer = require('multer');
-const imageController = require('../controllers/imageController');
+const { handlePrediction, trainModel } = require('../controllers/imageController');
 
 const router = express.Router();
 const upload = multer({ dest: 'images/' });
 
-router.post('/image', upload.single('image'), imageController.handleImage);
+router.post('/image', upload.single('image'), handlePrediction);
 router.post('/train', async (req, res) => {
     try {
-        await imageController.trainModel();
+        await trainModel();
         res.json({ message: 'Model trained successfully' });
     }
     catch(err) {
