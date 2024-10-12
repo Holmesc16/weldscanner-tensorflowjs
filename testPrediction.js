@@ -14,11 +14,11 @@ async function testPrediction(category) {
 
         console.log('Random image: ', randomImage.Key);
         
-        const imageBuffer = await getObjectFromS3(randomImage.Key);
+        const imageBuffer = await s3Client.send(new GetObjectCommand({ Bucket: bucket, Key: randomImage.Key }));
 
         // prepare form data
         const formData = new FormData();
-        formData.append('image', imageBuffer, randomImage.Key);
+        formData.append('image', imageBuffer.Body, randomImage.Key);
 
         // send request to prediction endpoint
         const predictionResponse = await axios.post('http://localhost:3000/image', formData, {
