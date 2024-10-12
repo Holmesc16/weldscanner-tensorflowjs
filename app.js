@@ -1,20 +1,15 @@
 const express = require('express');
 const app = express();
-const routes = require('./routes')
+const routes = require('./routes/index.js');
 
+// Middleware to parse JSON bodies
 app.use(express.json());
+
+// Use the routes
 app.use('/', routes);
 
-const { trainModel, evaluateModel } = require('./models/trainer.js');
-
-(async () => {
-    try {
-        await trainModel();
-    } catch (error) {
-        console.error('Error during model training:', error);
-    }
-    finally {
-        await evaluateModel()
-            .catch(err => console.error('Error during model evaluation:', err));
-    }
-})();
+// Start the server
+const PORT = 3000;
+app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+});
