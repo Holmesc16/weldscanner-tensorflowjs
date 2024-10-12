@@ -6,24 +6,29 @@ const bucket = 'weldscanner';
 
 async function testPrediction(category) {
     try {
-        // get random image from weldscanner bucket
-        const command = new ListObjectsV2Command({ Bucket: bucket });
-        const response = await s3Client.send(command);
-        const images = response.Contents;
+        // Get random image from the S3 bucket
+        const listCommand = new ListObjectsV2Command({ Bucket: bucket });
+        const listResponse = await s3Client.send(listCommand);
+        const images = listResponse.Contents;
         const randomImage = images[Math.floor(Math.random() * images.length)];  
 
         console.log('Random image: ', randomImage.Key);
         
-        const imageBuffer = await s3Client.send(new GetObjectCommand({ Bucket: bucket, Key: randomImage.Key }));
+        const getObjectCommand = new GetObjectCommand({ Bucket: bucket, Key: randomImage.Key });
+        const imageData = await s3Client.send(getObjectCommand);
+        
+        const chunks = [];
+        for await (const chunk of imageData.Body) {
+            chunks.push(chunk);
+        }
+        const imageBuffer = Buffer.concat(chunks);
 
-        // prepare form data
         const formData = new FormData();
-        formData.append('image', imageBuffer.Body, randomImage.Key);
+        formData.append('image', imageBuffer, randomImage.Key);
+        formData.append('category', category);
 
-        // send request to prediction endpoint
         const predictionResponse = await axios.post('http://localhost:3000/image', formData, {
             headers: { 
-                'Content-Type': 'multipart/form-data',
                 ...formData.getHeaders()
             }
         });
@@ -33,6 +38,7 @@ async function testPrediction(category) {
         console.error('Error during prediction:', error.response ? error.response.data : error.message);
     }
 }
+
 const categories = ['butt', 'saddle', 'electro'];
 const category = categories[Math.floor(Math.random() * categories.length)];
 
