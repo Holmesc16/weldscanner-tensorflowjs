@@ -227,14 +227,14 @@ exports.handlePrediction = async (req, res) => {
         console.log({ file, category });
         
         if (!file) 
-            return res.status(400).json({ error: 'No image file provided' })
+            return res.status(400).json({ error: 'No image file provided' });
 
         if (!category)
-            return res.status(400).json({ error: 'No weld category provided' })
+            return res.status(400).json({ error: 'No weld category provided' });
 
-        const imgTensor = await processImage(file.buffer)
+        const imgTensor = await processImage(file.buffer);
         if (!imgTensor)
-            return res.status(400).json({ error: 'Invalid image data'})
+            return res.status(400).json({ error: 'Invalid image data' });
 
         const categoryIndex = categories.indexOf(category);
         if (categoryIndex === -1) {
@@ -244,17 +244,24 @@ exports.handlePrediction = async (req, res) => {
 
         const model = await loadModel();
 
-        const prediction = model.predict({ imageInput: imgTensor.expandDims(), categoryInput: categoryEncoding })
-        const predictionValue = prediction.dataSync()[0]
-        const result = predictionValue > 0.5 ? 'Pass' : 'Fail'
+        // Ensure tensors are expanded to include batch dimension
+        const imageInput = imgTensor.expandDims();
+        const categoryInput = categoryEncoding.expandDims();
 
-        tf.dispose([imgTensor, categoryEncoding, prediction])
+        console.log(`Image tensor shape: ${imageInput.shape}`);
+        console.log(`Category tensor shape: ${categoryInput.shape}`);
+
+        const prediction = model.predict({ imageInput, categoryInput });
+        const predictionValue = prediction.dataSync()[0];
+        const result = predictionValue > 0.5 ? 'Pass' : 'Fail';
+
+        tf.dispose([imgTensor, categoryEncoding, prediction]);
         console.log(`Prediction for ${category}: ${result} (confidence: ${predictionValue})`);
         res.json({ category, result });
 
     } catch (err) {
-        console.error('Error handling image prediction:', err)
-        res.status(500).json({ error: err.message })
+        console.error('Error handling image prediction:', err);
+        res.status(500).json({ error: err.message });
     }
 };
 

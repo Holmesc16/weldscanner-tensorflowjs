@@ -4,14 +4,14 @@ const sharp = require('sharp');
 const targetWidth = 224; // Update to match MobileNet input size
 const targetHeight = 224;
 
-const processImage = async (file) => {
+const processImage = async (buffer) => {
     try {
-        console.log(`Processing image with buffer length: ${file.buffer.length}`);
-        if (!file || !file.buffer || file.buffer.length === 0) {
+        console.log(`Processing image with buffer length: ${buffer.length}`);
+        if (!buffer || buffer.length === 0) {
             throw new Error('Empty or invalid image buffer');
         }
 
-        const resizedBuffer = await sharp(file.buffer)
+        const resizedBuffer = await sharp(buffer)
             .resize(targetWidth, targetHeight)
             .toBuffer();
 
