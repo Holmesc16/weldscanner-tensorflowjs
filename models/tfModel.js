@@ -5,7 +5,7 @@ let model;
 
 const loadModel = async () => {
   if (!model) {
-    const modelPath = path.join(__dirname, '..', '_trained_models', 'weldscanner_quality_model', 'model.json');
+    const modelPath = path.join(__dirname, '..', '_trained_models', 'weldscanner_quality_model_v2', 'model.json');
     model = await tf.loadLayersModel(`file://${modelPath}`);
     console.log('Model loaded successfully.');
     console.log('Model inputs: ', model.inputs.map(input => input.name))
