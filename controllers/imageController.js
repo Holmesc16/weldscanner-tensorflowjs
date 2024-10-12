@@ -246,7 +246,7 @@ exports.handlePrediction = async (req, res) => {
 
         // Ensure tensors are expanded to include batch dimension
         const imageInput = imgTensor.expandDims();
-        const categoryInput = categoryEncoding.expandDims();
+        const categoryInput = categoryEncoding.expandDims(0);
 
         console.log(`Image tensor shape: ${imageInput.shape}`);
         console.log(`Category tensor shape: ${categoryInput.shape}`);
