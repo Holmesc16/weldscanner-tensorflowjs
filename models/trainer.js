@@ -46,6 +46,17 @@ async function createModel() {
     return model;
 }
 
+// async function evaluateModel() {
+//     const modelPath = path.join(__dirname, '..', '_trained_models', 'weldscanner_quality_model_v2');
+//     const model = await tf.loadLayersModel(`file://${modelPath}`);
+
+//     const batchSize = 16;
+//     const { testDataset, totalSize} = await createTestDataset(batchSize)
+
+//     const evalResult = await model.evaluateDataset(testDataset);
+//     console.log(`Test Loss: ${evalResult?.[0]?.dataSync()?.[0]}, Test Accuracy: ${evalResult?.[1]?.dataSync()?.[0]}`);
+// }
+
 async function trainModel() {
     const model = await createModel();
     const { trainDataset, valDataset, totalSize } = await createDataset(16);

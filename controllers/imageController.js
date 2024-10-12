@@ -247,7 +247,7 @@ exports.handlePrediction = async (req, res) => {
         const result = predictionValue > 0.5 ? 'Pass' : 'Fail'
 
         tf.dispose([imgTensor, categoryEncoding, prediction])
-
+        console.log(`Prediction for ${category}: ${result} (confidence: ${predictionValue})`);
         res.json({ category, result });
 
     } catch (err) {
