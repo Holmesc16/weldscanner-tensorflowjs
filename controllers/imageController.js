@@ -243,7 +243,10 @@ exports.handlePrediction = async (req, res) => {
         const categoryEncoding = tf.oneHot(categoryIndex, categories.length).expandDims(0);
 
         const model = await loadModel();
-
+        console.log(`Loaded model inputs: `, model.inputs.map(input => ({
+            name: input.name,
+            shape: input.shape
+        })));
         // Ensure tensors are expanded to include batch dimension
         const imageInput = imgTensor.expandDims();
         const categoryInput = categoryEncoding;
