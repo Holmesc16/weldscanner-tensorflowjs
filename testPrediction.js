@@ -12,6 +12,8 @@ async function testPrediction(category) {
         const images = response.Contents;
         const randomImage = images[Math.floor(Math.random() * images.length)];  
 
+        console.log('Random image: ', randomImage.Key);
+        
         const imageBuffer = await getObjectFromS3(randomImage.Key);
 
         // prepare form data
