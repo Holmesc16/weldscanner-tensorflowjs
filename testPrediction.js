@@ -10,8 +10,14 @@ async function testPrediction(category) {
         const listCommand = new ListObjectsV2Command({ Bucket: bucket });
         const listResponse = await s3Client.send(listCommand);
         const images = listResponse.Contents;
-        const randomImage = images[Math.floor(Math.random() * images.length)];  
+        
+        const categoryImages = images.filter(image=> image.Key.includes(category))
+        if (categoryImages.length === 0) {
+            console.error(`No images found for category: ${category}`);
+            return;
+        }
 
+        const randomImage = categoryImages[Math.floor(Math.random() * categoryImages.length)];
         console.log('Random image: ', randomImage.Key);
         
         const getObjectCommand = new GetObjectCommand({ Bucket: bucket, Key: randomImage.Key });
