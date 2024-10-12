@@ -246,12 +246,12 @@ exports.handlePrediction = async (req, res) => {
 
         // Ensure tensors are expanded to include batch dimension
         const imageInput = imgTensor.expandDims();
-        const categoryInput = categoryEncoding
+        const categoryInput = categoryEncoding;
 
         console.log(`Image tensor shape: ${imageInput.shape}`);
         console.log(`Category tensor shape: ${categoryInput.shape}`);
 
-        const prediction = model.predict({ imageInput, categoryInput });
+        const prediction = model.predict([imageInput, categoryInput]);
         const predictionValue = prediction.dataSync()[0];
         const result = predictionValue > 0.5 ? 'Pass' : 'Fail';
 
