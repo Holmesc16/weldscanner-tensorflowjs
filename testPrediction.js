@@ -37,11 +37,13 @@ async function testPrediction(category) {
                         ...formData.getHeaders()
                     }
                 });
-                const { category, result } = predictionResponse.data;
+                const { result } = predictionResponse.data;
                 const expectedCategory = category;
-                const returnedCategory = category;
+                const returnedCategory = predictionResponse.data.category;
+
                 console.log(chalk.cyan.bold('Expected: '), chalk.yellow.bgBlack(expectedCategory));
                 console.log(chalk.yellow.bold('Returned: '), chalk.yellow.bgBlack(returnedCategory));
+                
                 if (expectedCategory !== returnedCategory) {
                     console.log(chalk.red.bold('Inaccurate Prediction'));
                 }
