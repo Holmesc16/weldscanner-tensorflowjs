@@ -255,17 +255,17 @@ exports.handlePrediction = async (req, res) => {
         if (categoryIndex === -1) {
             return res.status(400).json({ error: `Category not found in categories array: ${category}` });
         }
-        const categoryEncoding = tf.oneHot(categoryIndex, categories.length); // Shape: [3]
-
+        
         const model = await loadModel();
         console.log(`Loaded model inputs: `, model.inputs.map(input => ({
             name: input.name,
             shape: input.shape
         })));
         // Ensure tensors are expanded to include batch dimension
-        const imageInput = imgTensor.expandDims();
-        const categoryInput = categoryEncoding.expandDims(); // Shape: [1, 3]
-
+        const categoryEncoding = tf.oneHot(categoryIndex, categories.length); // Shape: [3]
+        const categoryInput = categoryEncoding.expandDims(0); // Shape: [1, 3]
+        const imageInput = imgTensor.expandDims(0);
+        
         console.log(`Image tensor shape: ${imageInput.shape}`);
         console.log(`Category tensor shape: ${categoryInput.shape}`);
 
