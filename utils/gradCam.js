@@ -16,68 +16,45 @@ const findLayersByName = (model, layerName) => {
 };
 
 async function computeGradCAM(model, imageInput, categoryInput) {
-    const baseModel = model.getLayer('model1');
-    // get the base model
-    console.log('Base Model Layers:');
-    baseModel.layers.forEach((layer, index) => {
-        console.log(`Layer ${index}: ${layer.name}, Output Shape: ${layer.outputShape}`);
-    });
-
-    // conv_pw_13_relu is at index 81 of the base model layers, lets find it
-    const lastConvLayerName = 'conv_pw_13_relu'
-    const lastConvLayer = findLayersByName(baseModel, lastConvLayerName);
-
-    if (!lastConvLayer) {
-        throw new Error(`Could not find layer ${lastConvLayerName} in the base model.`);
-    }
-
-    const lastConvLayerOutput = lastConvLayer.output;
-    console.log('Last Conv Layer Output Shape:', lastConvLayerOutput.shape);
+    const lastConvLayerOutput = model.lastConvLayerOutput;
 
     const gradModel = tf.model({
         inputs: model.inputs,
         outputs: [lastConvLayerOutput, model.output]
     });
-
+    // record operations for automatic differentiation
+    const tape = await tf.engine().startScope();
+    
     const [convOutputs, predictions] = await gradModel.predictOnBatch([imageInput, categoryInput]);
 
+    // compute gradients of predictions with respect to convOutputs / last convolutional layer
     const grads = tf.grad(inputs => {
         const [convOutputs, predictions] = gradModel.apply(inputs);
-        const loss = predictions.mean();
-        return loss;
+        return predictions.mean();
     })([imageInput, categoryInput])[0];
 
-    console.log('Grad Model Layers:');
-    gradModel.layers.forEach((layer, index) => {
-        console.log(`Layer ${index}: ${layer.name}, Output Shape: ${layer.outputShape}`);
-    });
+    // compute guided gradients
+    const guidedGrads = grads.mul(convOutputs.greater(0))
 
-    const gradFunction = tf.function((inputs) => {
-        return tf.tidy(() => {
-            const [convOutputs, predictions] = gradModel.apply(inputs);
-            const loss = predictions.mean();
-            const grads = tf.grad((x) => loss)(convOutputs)
-            return [convOutputs, grads]
-        })
-    });
+    // compute weights using mean of guided gradients
+    const weights = tf.mean(guidedGrads, [0, 1, 2]);
 
-    const [convOutputsValue, gradsValues] = gradFunction([imageInput, categoryInput]);
+    // compute the grad-CAM heatmap
+    const cam = convOutputs.mul(weights).mean(2);
 
-    const pooledGrads = tf.mean(gradsValues, [0, 1, 2]);
+    // apply ReLU to heatmap
+    const heatmap = cam.relu();
 
-    const convOutputsMultiplied = convOutputsValue.mul(pooledGrads.expandDims(0).expandDims(0));
+    // normalize heatmap to [0, 1]
+    const headMapNormalized = heatmap.div(tf.max(heatmap));
 
-    const heatmap = convOutputsMultiplied.mean(-1)
+    // end the tape scope
+    tf.engine().endScope(tape);
 
-    const heatmapRelu = heatmap.relu();
-
-    const minVal = heatmapRelu.min();
-    const maxVal = heatmapRelu.max();
-    const heatmapNormalized = heatmapRelu.sub(minVal).div(maxVal.sub(minVal))
-
-    return heatmapNormalized;
+    return headMapNormalized;   
 }
 
 module.exports = {
-    computeGradCAM
+    computeGradCAM,
+    findLayersByName
 }

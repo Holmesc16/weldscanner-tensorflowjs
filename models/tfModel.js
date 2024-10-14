@@ -1,21 +1,51 @@
 const tf = require('@tensorflow/tfjs-node');
 const path = require('path');
+const { findLayersByName } = require('../utils/gradCam');
 
 let model;
 
 const loadModel = async () => {
 if (!model) {
-    const modelPath = path.join(__dirname, '..', '_trained_models', 'weldscanner_quality_model_v2', 'model.json');
-    model = await tf.loadLayersModel(`file://${modelPath}`);
-    console.log('Model loaded successfully.');
+    const baseModel = await tf.loadLayersModel('https://storage.googleapis.com/tfjs-models/tfjs/mobilenet_v1_0.25_224/model.json');
+    baseModel.trainable = false;
 
-    console.log('Model inputs:', model.inputs.map(input => ({ name: input.name, shape: input.shape })));
-    console.log('Model Layers:');
+    const imageInput = tf.input({ shape: [224, 224, 3], name: 'imageInput' });
+    const categoryInput = tf.input({ shape: [3], name: 'categoryInput' });
+
+    const baseModelOutput = baseModel.apply(imageInput);
+
+    // get output of last conv layer
+    const lastConvLayerName = 'conv_pw_13_relu'
+    const lastConvLayer = findLayersByName(baseModel, lastConvLayerName);
+    const lastConvLayerOutput = lastConvLayer.apply(baseModelOutput);
+
+    // build model
+    const baseModelFlattened = tr.layers.flatten().apply(baseModelOutput);
+    const categoryDense = tf.layers.dense({ units: 32, activation: 'relu', name: 'categoryDense' }).apply(categoryInput);
+
+    const concatenated = tf.layers.concatenate().apply([baseModelFlattened, categoryDense]);
+
+    let x = concatenated;
+    x = tf.layers.dense({ units: 128, activation: 'relu', name: 'dense_1'}).apply(x);
+    x = tf.layers.dropout({ rate: 0.5, name: 'dropout_1'}).apply(x);
+    x = tf.layers.dense({ units: 64, activation: 'relu', name: 'dense_2'}).apply(x);
+    x = tf.layers.dropout({ rate: 0.5, name: 'dropout_2'}).apply(x);
     
-    model.layers.forEach((layer, index) => {
-            console.log(`Layer ${index}: ${layer.name} Output Shape: ${layer.outputShape}, Inbound Nodes: ${layer.inboundNodes.length}`);
-        });
-    }
+    const output = tf.layers.dense({ units: 1, activation: 'sigmoid', name: 'output' }).apply(x);
+    const outputReshaped = tf.layers.reshape({ targetShape: [1] }).apply(output);
+
+    model = tf.model({ inputs: [imageInput, categoryInput], outputs: outputReshaped });
+
+   const modelPath = path.join(__dirname, '..', '_trained_models', 'weldscanner_quality_model_v2', 'model.json');
+   await model.loadWeights(`file://${modelPath}`);
+   console.log('Model loaded successfully.');
+   console.log('Model inputs:', model.inputs.map(input => ({ name: input.name, shape: input.shape })));
+   console.log('Model Layers:');
+   model.layers.forEach((layer, index) => {
+        console.log(`Layer ${index}: ${layer.name} Output Shape: ${layer.outputShape}, Inbound Nodes: ${layer.inboundNodes.length}`);
+    });
+    model.lastConvLayerOutput = lastConvLayerOutput;
+}
     return model;
 };
 
