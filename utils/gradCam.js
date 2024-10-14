@@ -8,7 +8,7 @@ async function computeGradCAM(model, imageInput, categoryInput) {
         throw new Error(`Layer ${lastConvLayerName} not found in model.`);
     }
 
-    const lastConvLayerOutput = lastConvLayer.output;
+    const lastConvLayerOutput = lastConvLayer.getOutputAt(0);
 
     const gradModel = tf.model({
         inputs: model.inputs,

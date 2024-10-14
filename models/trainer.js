@@ -52,7 +52,7 @@ async function createModel(dropoutRate = 0.5, regularizerStrength = 0.001) {
 
     const lastConvLayerName ='conv_pw_13_relu' // name of last convolutional layer in mobilenet
     const lastConvLayer = baseModel.getLayer(lastConvLayerName);
-    const lastConvLayerOutput = lastConvLayer.output;
+    const lastConvLayerOutput = lastConvLayer.getOutputAt(0);
 
     const baseModelOutput = baseModel.apply(imageInput);
     const baseModelFlattened = tf.layers.flatten().apply(baseModelOutput);
