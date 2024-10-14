@@ -2,6 +2,8 @@
 
 const processImage = require('../utils/imageProcessor.js');
 const { loadModel } = require('../models/tfModel.js');
+const { computeGradCAM } = require('../utils/gradCam.js');
+const { createCanvas, loadImage } = require('canvas');
 const tf = require('@tensorflow/tfjs-node');
 const { S3Client, ListObjectsV2Command, GetObjectCommand } = require('@aws-sdk/client-s3');
 const sharp = require('sharp');
@@ -10,7 +12,7 @@ const bucket = 'weldscanner';
 const categories = ['butt', 'saddle', 'electro'];
 const targetWidth = 150;
 const targetHeight = 150;
-const numAugmentations = 5;
+const numAugmentations = 10; // increasing from 5 to 10
 
 const streamToBuffer = (stream) => {
     const chunks = [];
@@ -30,11 +32,24 @@ const augmentImage = async (imageBuffer) => {
         let sharpImage = sharp(imageBuffer);
 
         // Apply random transformations
-        const rotation = Math.floor(Math.random() * 80 - 40);
+        const rotation = Math.floor(Math.random() * 360);
         sharpImage = sharpImage.rotate(rotation);
 
         if (Math.random() > 0.5) sharpImage = sharpImage.flip();
         if (Math.random() > 0.5) sharpImage = sharpImage.flop();
+
+        // random brightness and saturation
+        const brightness = Math.random() * 0.4 + 0.8;
+        const saturation = Math.random() * 0.4 + 0.8;
+        sharpImage = sharpImage.modulate({ brightness, saturation });
+
+        // random cropping
+        const metadata = await sharpImage.metadata();
+        const cropWidth = Math.floor(metadata.width * (Math.random() * 0.2 + 0.8));
+        const cropHeight = Math.floor(metadata.height * (Math.random() * 0.2 + 0.8));
+        const cropX = Math.floor(Math.random() * (metadata.width - cropWidth));
+        const cropY = Math.floor(Math.random() * (metadata.height - cropHeight));
+        sharpImage = sharpImage.extract({ width: cropWidth, height: cropHeight, left: cropX, top: cropY });
 
         // Resize the image to 224x224
         sharpImage = sharpImage.resize(224, 224);
@@ -258,9 +273,57 @@ exports.handlePrediction = async (req, res) => {
         const predictionValue = prediction.dataSync()[0];
         const result = predictionValue > 0.5 ? 'Pass' : 'Fail';
 
-        tf.dispose([imgTensor, categoryEncoding, prediction]);
+        // Compute GradCAM
+        const heatmapTensor = await computeGradCAM(model, imageInput, categoryInput);
+
+        // Resize heatmap to match image dimensions
+        const heatmapResized = tf.image.resizeBilinear(heatmapTensor, [224, 224]);
+
+        const heatmapData = heatmapResized.squeeze().arraySync();
+
+        // Create an overlay of the heatmap on the original image
+        const canvas = createCanvas(224, 224)
+        const ctx = canvas.getContext('2d')
+
+        // Draw original image 
+        const imgData = await loadImage(file.buffer)
+        ctx.drawImage(imgData, 0, 0, 224, 224)
+
+        // Draw heatmap
+        const heatmapCanvas = createCanvas(224, 224)
+        const heatmapCtx = heatmapCanvas.getContext('2d')
+
+        const imageData = heatmapCtx.createImageData(224, 224)
+        for (let i = 0; i < 224; i++) {
+            for (let j = 0; j < 224; j++) {
+                const alpha = Math.floor(heatmapData[i][j] * 255)
+                const index = (i * 224 + j) * 4;
+                imageData.data[index] = 255; // red channel
+                imageData.data[index + 1] = 0; // green channel
+                imageData.data[index + 2] = 0; // blue channel
+                imageData.data[index + 3] = alpha; // alpha channel
+            }
+        }
+        heatmapCtx.putImageData(imageData, 0, 0)
+
+        ctx.drawImage(heatmapCanvas, 0, 0, 224, 224)
+
+        // get result as base64 string
+        const overlayImageBuffer = canvas.toBuffer('image/png')
+        const base64Heatmap = overlayImageBuffer.toString('base64')
+
+        // save heatmap to s3
+        const s3Params = {
+            Bucket: bucket,
+            Key: `heatmaps/${category}/${file.originalname}${Date.now()}.png`,
+            Body: base64Heatmap,
+            ContentType: 'image/png'
+        }
+        await s3Client.send(new PutObjectCommand(s3Params))
+
+        tf.dispose([imgTensor, categoryEncoding, prediction, heatmapTensor, heatmapResized]);
         console.log(`Prediction for ${category}: ${result} (confidence: ${predictionValue})`);
-        res.json({ category, result });
+        res.json({ category, result }); // heatmap: base64Heatmap 
 
     } catch (err) {
         console.error('Error handling image prediction:', err);
