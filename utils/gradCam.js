@@ -1,9 +1,18 @@
 const tf = require('@tensorflow/tfjs-node');
 
 async function computeGradCAM(model, imageInput, categoryInput) {
+    const lastConvLayerName = 'conv_pw_13_relu'
+    const lastConvLayer = model.getLayer(lastConvLayerName);
+    
+    if (!lastConvLayer) {
+        throw new Error(`Layer ${lastConvLayerName} not found in model.`);
+    }
+
+    const lastConvLayerOutput = lastConvLayer.output;
+
     const gradModel = tf.model({
         inputs: model.inputs,
-        outputs: [model.lastConvLayerOutput, model.output]
+        outputs: [lastConvLayerOutput, model.output]
     });
 
     const [convOutputs, predictions] = await gradModel.predictOnBatch([imageInput, categoryInput]);

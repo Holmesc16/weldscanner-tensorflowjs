@@ -9,7 +9,11 @@ const loadModel = async () => {
     model = await tf.loadLayersModel(`file://${modelPath}`);
     console.log('Model loaded successfully.');
     console.log('Model inputs: ', model.inputs.map(input => input.name))
-  }
+    console.log('Model Layers: ')
+    model.layers.forEach((layer, index) => {
+        console.log(`Layer ${index}: ${layer.name}`, `Output Shape: ${layer.output.shape}`)
+    })
+}
   return model;
 };
 
