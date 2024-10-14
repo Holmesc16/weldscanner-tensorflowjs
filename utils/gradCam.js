@@ -1,5 +1,20 @@
 const tf = require('@tensorflow/tfjs-node');
 
+const findLayersByName = (model, layerName) => {
+    for (const layer of model.layers) {
+        if (layer.name === layerName) {
+            return layer;
+        }
+        else if(layer instanceof tf.Sequential || layer instanceof tf.LayersModel) {
+            const nestedLayer = findLayersByName(layer, layerName);
+            if (nestedLayer) {
+                return nestedLayer;
+            }
+        }
+    }
+    return null;
+};
+
 async function computeGradCAM(model, imageInput, categoryInput) {
     const baseModel = model.getLayer('model1');
     // get the base model
@@ -8,14 +23,15 @@ async function computeGradCAM(model, imageInput, categoryInput) {
         console.log(`Layer ${index}: ${layer.name}, Output Shape: ${layer.outputShape}`);
     });
 
+    // conv_pw_13_relu is at index 81 of the base model layers, lets find it
     const lastConvLayerName = 'conv_pw_13_relu'
-    const lastConvLayer = model.getLayer(lastConvLayerName);
+    const lastConvLayer = findLayersByName(baseModel, lastConvLayerName);
 
     if (!lastConvLayer) {
-        throw new Error(`Layer ${lastConvLayerName} not found in model.`);
+        throw new Error(`Could not find layer ${lastConvLayerName} in the base model.`);
     }
 
-    const lastConvLayerOutput = lastConvLayer.getOutputAt(0);
+    const lastConvLayerOutput = lastConvLayer.output;
     console.log('Last Conv Layer Output Shape:', lastConvLayerOutput.shape);
 
     const gradModel = tf.model({
@@ -23,15 +39,18 @@ async function computeGradCAM(model, imageInput, categoryInput) {
         outputs: [lastConvLayerOutput, model.output]
     });
 
+    const [convOutputs, predictions] = await gradModel.predictOnBatch([imageInput, categoryInput]);
+
+    const grads = tf.grad(inputs => {
+        const [convOutputs, predictions] = gradModel.apply(inputs);
+        const loss = predictions.mean();
+        return loss;
+    })([imageInput, categoryInput])[0];
+
     console.log('Grad Model Layers:');
     gradModel.layers.forEach((layer, index) => {
         console.log(`Layer ${index}: ${layer.name}, Output Shape: ${layer.outputShape}`);
     });
-
-    const [convOutputs, predictions] = await gradModel.predictOnBatch([imageInput, categoryInput]);
-
-    const convOutputTensor = convOutputs;
-    const predictionTensor = predictions;
 
     const gradFunction = tf.function((inputs) => {
         return tf.tidy(() => {
