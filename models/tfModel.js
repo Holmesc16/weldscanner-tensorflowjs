@@ -7,17 +7,25 @@ let model;
 const loadModel = async () => {
 if (!model) {
     const baseModel = await tf.loadLayersModel('https://storage.googleapis.com/tfjs-models/tfjs/mobilenet_v1_0.25_224/model.json');
-    baseModel.trainable = false;
+    
+    // truncate the model to exclude the last layers (e.g., classification layers)
+    const truncatedBaseModel = tf.model({
+        inputs: baseModel.inputs,
+        outputs: baseModel.layers[baseModel.layers.length - 4].output // exclude the last 4 layers
+    });
+    truncatedBaseModel.trainable = false;
 
+    // create new inputs for the image and category
     const imageInput = tf.input({ shape: [224, 224, 3], name: 'imageInput' });
     const categoryInput = tf.input({ shape: [3], name: 'categoryInput' });
 
-    const baseModelOutput = baseModel.apply(imageInput);
+    const baseModelOutput = truncatedBaseModel.apply(imageInput);
+    console.log(`Base model output shape: ${baseModelOutput.shape}`);
 
     // get output of last conv layer
     const lastConvLayerName = 'conv_pw_13_relu'
-    const lastConvLayer = findLayersByName(baseModel, lastConvLayerName);
-    const lastConvLayerOutput = lastConvLayer.apply(baseModelOutput);
+    const lastConvLayer = findLayersByName(truncatedBaseModel, lastConvLayerName);
+    const lastConvLayerOutput = lastConvLayer.output;
 
     // build model
     const baseModelFlattened = tf.layers.flatten().apply(baseModelOutput);
