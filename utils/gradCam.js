@@ -25,13 +25,15 @@ async function computeGradCAM(model, imageInput, categoryInput) {
     // record operations for automatic differentiation
     const tape = await tf.engine().startScope();
     
-    const [convOutputs, predictions] = await gradModel.predictOnBatch([imageInput, categoryInput]);
+    const [convOutputs, predictions] = await gradModel.predictOnBatch({ imageInput, categoryInput });
 
     // compute gradients of predictions with respect to convOutputs / last convolutional layer
-    const grads = tf.grad(inputs => {
+    const gradFunction = tf.grads(inputs => {
         const [convOutputs, predictions] = gradModel.apply(inputs);
         return predictions.mean();
-    })([imageInput, categoryInput])[0];
+    });
+    
+    const [grads] = gradFunction({ imageInput, categoryInput }, [convOutputs]);    
 
     // compute guided gradients
     const guidedGrads = grads.mul(convOutputs.greater(0))
