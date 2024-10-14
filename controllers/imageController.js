@@ -255,7 +255,7 @@ exports.handlePrediction = async (req, res) => {
         if (categoryIndex === -1) {
             return res.status(400).json({ error: `Category not found in categories array: ${category}` });
         }
-        const categoryEncoding = tf.oneHot(categoryIndex, categories.length).expandDims(0);
+        const categoryEncoding = tf.oneHot(categoryIndex, categories.length).expandDims();
 
         const model = await loadModel();
         console.log(`Loaded model inputs: `, model.inputs.map(input => ({
@@ -269,12 +269,12 @@ exports.handlePrediction = async (req, res) => {
         console.log(`Image tensor shape: ${imageInput.shape}`);
         console.log(`Category tensor shape: ${categoryInput.shape}`);
 
-        const prediction = model.predict({ imageInput, categoryInput });
+        const prediction = model.predict({ imageInput, categoryInput: categoryEncoding });
         const predictionValue = prediction.dataSync()[0];
         const result = predictionValue > 0.5 ? 'Pass' : 'Fail';
 
         // Compute GradCAM
-        const heatmapTensor = await computeGradCAM(model, imageInput, categoryInput);
+        const heatmapTensor = await computeGradCAM(model, imageInput, categoryEncoding);
 
         // Resize heatmap to match image dimensions
         const heatmapResized = tf.image.resizeBilinear(heatmapTensor, [224, 224]);
