@@ -20,7 +20,7 @@ if (!model) {
     const lastConvLayerOutput = lastConvLayer.apply(baseModelOutput);
 
     // build model
-    const baseModelFlattened = tr.layers.flatten().apply(baseModelOutput);
+    const baseModelFlattened = tf.layers.flatten().apply(baseModelOutput);
     const categoryDense = tf.layers.dense({ units: 32, activation: 'relu', name: 'categoryDense' }).apply(categoryInput);
 
     const concatenated = tf.layers.concatenate().apply([baseModelFlattened, categoryDense]);
