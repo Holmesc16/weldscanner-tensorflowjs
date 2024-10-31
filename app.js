@@ -3,7 +3,6 @@ const app = express();
 const routes = require('./routes/index.js');
 const cors = require('cors');
 
-// Middleware to parse JSON bodies
 app.use(cors({
     origin: [
         'http://localhost:19006',
