@@ -224,7 +224,7 @@ exports.handlePrediction = async (req, res) => {
         const { file } = req;
         const { category } = req.body;
 
-        console.log({ file, category });
+        console.log({ file, category, req });
         
         if (!file) 
             return res.status(400).json({ error: 'No image file provided' });
