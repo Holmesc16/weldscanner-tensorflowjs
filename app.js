@@ -1,10 +1,17 @@
 const express = require('express');
 const app = express();
 const routes = require('./routes/index.js');
+const cors = require('cors');
 
 // Middleware to parse JSON bodies
-app.use(express.json());
+app.use(cors({
+    origin: [
+        'http://localhost:19006',
+        'exp://192.168.1.12:8081'
+    ],
+}));
 
+app.use(express.json());
 // Use the routes
 app.use('/', routes);
 
