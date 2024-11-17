@@ -6,7 +6,8 @@ const { trainModel, evaluateModel } = require('./models/trainer.js');
     } catch (error) {
         console.error('Error during model training:', error);
     } finally {
-        await evaluateModel()
-            .catch(err => console.error('Error during model evaluation:', err));
+        console.log('Model training completed');
+        // await evaluateModel()
+        //     .catch(err => console.error('Error during model evaluation:', err));
     }
 })();

@@ -17,6 +17,9 @@ const processImage = async (buffer) => {
         }
 
         const metadata = await sharp(buffer).metadata();
+        if (!metadata || !metadata.width || !metadata.height) {
+            throw new Error(`Invalid image metadata: ${imageKey}`);
+        }
         console.log(`Original image dimensions: ${metadata.width}x${metadata.height}`);
         
         const resizedBuffer = await sharp(buffer)

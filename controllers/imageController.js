@@ -15,6 +15,9 @@ const numAugmentations = 5;
 const streamToBuffer = (stream) => {
     const chunks = [];
     return new Promise((resolve, reject) => {
+        if (!stream || typeof stream.on !== 'function') {
+            return reject(new Error('Invalid stream'));
+        }
         stream.on('data', (chunk) => {
             console.log(`Received chunk of size: ${chunk.length}`);
             chunks.push(chunk)
@@ -148,7 +151,9 @@ exports.createDataset = async (batchSize) => {
                 continue;
             }
 
-            const imgTensor = await processImage({ buffer: imgBuffer });
+            // testing image processor with raw buffer, instead of imgBuffer
+            const imgTensor = await processImage(imgBuffer);
+            // const imgTensor = await processImage({ buffer: imgBuffer });
             if (!imgTensor || imgTensor.shape.length !== 3) {
                 console.error(`Invalid image tensor for S3 Key: ${imageKey}, shape: ${imgTensor ? imgTensor.shape : 'undefined'}`);
                 continue;
