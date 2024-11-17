@@ -15,9 +15,18 @@ const numAugmentations = 5;
 const streamToBuffer = (stream) => {
     const chunks = [];
     return new Promise((resolve, reject) => {
-        stream.on('data', (chunk) => chunks.push(chunk));
-        stream.on('end', () => resolve(Buffer.concat(chunks)));
-        stream.on('error', (err) => reject(err));
+        stream.on('data', (chunk) => {
+            console.log(`Received chunk of size: ${chunk.length}`);
+            chunks.push(chunk)
+        });
+        stream.on('end', () => {
+            console.log(`Stream ended, concatenating chunks...`);
+            resolve(Buffer.concat(chunks));
+        });
+        stream.on('error', (err) => {
+            console.error('Error during stream:', err);
+            reject(err);
+        });
     });
 };
 
@@ -93,6 +102,7 @@ exports.createDataset = async (batchSize) => {
     };
 
     const imageEntries = await getAllImageKeys();
+    console.log(`Total image entries: ${imageEntries.length}`);
 
     if (imageEntries.length === 0) {
         throw new Error('No valid data to process. Ensure that images are available in S3.');
@@ -127,8 +137,11 @@ exports.createDataset = async (batchSize) => {
             const categoryEncoding = tf.oneHot(categoryIndex, categories.length);
 
             const getObjectParams = { Bucket: bucket, Key: imageKey };
+            console.log(`Getting object params for ${imageKey}`);
             const imgData = await s3Client.send(new GetObjectCommand(getObjectParams));
+            console.log(`Fetched image data for ${imageKey}`);
             const imgBuffer = await streamToBuffer(imgData.Body);
+            console.log(`Image buffer length for ${imageKey}:`, imgBuffer.length);
 
             if (!imgBuffer || imgBuffer.length === 0) {
                 console.error(`Empty image buffer for S3 Key: ${imageKey}`);

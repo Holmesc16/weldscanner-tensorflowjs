@@ -7,14 +7,22 @@ const targetHeight = 224;
 const processImage = async (buffer) => {
     try {
         console.log(`Processing image with buffer length: ${buffer.length}`);
+        
+        if (!Buffer.isBuffer(buffer)) {
+            throw new Error('Input is not a valid buffer');
+        }
+        
         if (!buffer || buffer.length === 0) {
             throw new Error('Empty or invalid image buffer');
         }
 
+        const metadata = await sharp(buffer).metadata();
+        console.log(`Original image dimensions: ${metadata.width}x${metadata.height}`);
+        
         const resizedBuffer = await sharp(buffer)
             .resize(targetWidth, targetHeight)
             .toBuffer();
-
+        console.log(`Resized image to ${targetWidth}x${targetHeight}`);
         const imgTensor = tf.node.decodeImage(resizedBuffer, 3)
             .toFloat()
             .div(255.0); // Normalize to [0, 1]
