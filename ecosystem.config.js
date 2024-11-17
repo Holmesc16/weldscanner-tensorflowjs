@@ -7,7 +7,7 @@ module.exports = {
         },
         {
             name: 'weldscanner-trainer',
-            script: 'models/trainer.js',
+            script: 'train.js',
             node_args: '--max-old-space-size=4096',
         }
     ]
