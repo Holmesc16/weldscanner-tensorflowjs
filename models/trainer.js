@@ -69,7 +69,7 @@ async function trainModel() {
                 metrics: ['accuracy']
             })
 
-            const lrScheduler = tf.callbacks.learningRateScheduler((epoch, lr) => {
+            const lrScheduler = tf.callbacks.LearningRateScheduler((epoch, lr) => {
                 if (epoch > 5) return lr
                 else return lr * 0.9 // reduce learning rate by 10% every epoch after the 5th
             })
