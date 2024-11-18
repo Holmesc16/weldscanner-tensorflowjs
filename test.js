@@ -32,7 +32,7 @@ async function testAll() {
             formData.append('image', imageBuffer, image.Key)
             formData.append('category', category)
 
-            const prediciton = await axios.post('http://localhost:3000/predict  ', formData, {
+            const prediciton = await axios.post('http://localhost:3000/api/predict  ', formData, {
                 headers: {
                     ...formData.getHeaders()
                 }
