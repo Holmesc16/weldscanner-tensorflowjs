@@ -47,6 +47,22 @@ async function createModel() {
     return model
 }
 
+class LearningRateScheduler {
+    constructor(schedule) {
+        this.schedule = schedule;
+    }
+
+    setModel(model) {
+        this.model = model; // Ensure the callback is linked to the model
+    }
+
+    onEpochBegin(epoch, logs) {
+        const newLearningRate = this.schedule(epoch, this.model.optimizer.learningRate);
+        this.model.optimizer.learningRate = newLearningRate;
+        console.log(`Epoch ${epoch + 1}: Learning rate updated to ${newLearningRate}`);
+    }
+}
+
 async function trainModel() {
     // const model = await createModel()
     const { trainDataset, valDataset, totalSize } = await createDataset(16)
@@ -69,18 +85,22 @@ async function trainModel() {
                 metrics: ['accuracy']
             })
 
-            const lrScheduler = tf.callbacks.LearningRateScheduler((epoch, lr) => {
-                if (epoch > 5) return lr
-                else return lr * 0.9 // reduce learning rate by 10% every epoch after the 5th
+            const learningRateScheduler = new LearningRateScheduler((epoch, currentLearningRate) => {
+                return epoch > 5 ? currentLearningRate : currentLearningRate * 0.9 // reduce learning rate by 10% every epoch after the 5th
             })
+
             const history = await model.fitDataset(trainDataset, {
                 epochs: epochs,
                 validationData: valDataset,
-                batchSize: batchSize,
-                callbacks: [tf.callbacks.earlyStopping({ monitor: 'val_loss', patience: 5 }), lrScheduler]
+                callbacks: [
+                    tf.callbacks.earlyStopping({ monitor: 'val_loss', patience: 5 }),
+                    learningRateScheduler
+                ]
             })
 
-            const valAccuracy = history.history.val_accuracy[history.history.val_accuracy.length - 1]
+            const valAccuracy = history.history.val_accuracy
+                ? history.history.val_accuracy[history.history.val_accuracy.length - 1]
+                : 0;
             console.log(`Validation accuracy for learning rate ${lr} and batch size ${batchSize}: ${valAccuracy}`)
             if (valAccuracy > bestValAccuracy) {
                 bestValAccuracy = valAccuracy
