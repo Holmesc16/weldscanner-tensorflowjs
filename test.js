@@ -1,68 +1,101 @@
-const axios = require('axios')
-const FormData = require('form-data')
-const { S3Client, ListObjectsV2Command, GetObjectCommand, PutObjectCommand } = require('@aws-sdk/client-s3')
-const s3Client = new S3Client({ region: 'us-west-1' })
-const { Parser } = require('json2csv')
-const bucket = 'weldscanner'
+const tf = require('@tensorflow/tfjs-node');
+const sharp = require('sharp');
+const { S3Client, ListObjectsV2Command, GetObjectCommand, PutObjectCommand } = require('@aws-sdk/client-s3');
+const { Parser } = require('json2csv');
+const s3Client = new S3Client({ region: 'us-west-1' });
+const bucket = 'weldscanner';
+const categories = ['butt', 'saddle', 'electro'];
 
-async function testAll() {
+async function loadModel() {
+    const modelPath = 'file://path/to/your/model'; // Update with your model path
+    return await tf.loadLayersModel(modelPath);
+}
+
+async function processImage(imageBuffer) {
+    const resizedBuffer = await sharp(imageBuffer)
+        .resize(224, 224)
+        .toBuffer();
+    const imgTensor = tf.node.decodeImage(resizedBuffer, 3)
+        .toFloat()
+        .div(255.0); // Normalize to [0, 1]
+    return imgTensor.expandDims(); // Add batch dimension
+}
+
+async function testPrediction(category) {
+    const predictions = [];
     try {
-        const listCommand = new ListObjectsV2Command({ Bucket: bucket })
-        const listResponse = await s3Client.send(listCommand)
-        const images = listResponse.Contents
+        // Load the model
+        const model = await loadModel();
 
-        images.sort((a, b) => new Date(a.LastModified) - new Date(b.LastModified))
+        // Get images from the S3 bucket
+        const listCommand = new ListObjectsV2Command({ Bucket: bucket });
+        const listResponse = await s3Client.send(listCommand);
+        const images = listResponse.Contents;
 
-        const predictions = []
+        const categoryImages = images.filter(image => image.Key.includes(category));
+        if (categoryImages.length === 0) {
+            console.error(`No images found for category: ${category}`);
+            return;
+        }
 
-        for (const image of images) {
-            const category = image.Key.split('/')[0]
-            console.log(`Processing image ${image.Key}`)
+        for (const image of categoryImages) {
+            console.log('Processing image: ', image.Key);
 
-            const getObjectCommand = new GetObjectCommand({ Bucket: bucket, Key: image.Key })
-            const imageData = await s3Client.send(getObjectCommand)
+            const getObjectCommand = new GetObjectCommand({ Bucket: bucket, Key: image.Key });
+            const imageData = await s3Client.send(getObjectCommand);
 
-            const chunks = []
+            const chunks = [];
             for await (const chunk of imageData.Body) {
-                chunks.push(chunk)
+                chunks.push(chunk);
             }
-            const imageBuffer = Buffer.concat(chunks)
+            const imageBuffer = Buffer.concat(chunks);
 
-            const formData = new FormData()
-            formData.append('image', imageBuffer, image.Key)
-            formData.append('category', category)
+            // Process the image
+            const imgTensor = await processImage(imageBuffer);
 
-            const prediciton = await axios.post('http://localhost:3000/api/predict  ', formData, {
-                headers: {
-                    ...formData.getHeaders()
-                }
-            })
+            // Create category encoding
+            const categoryIndex = categories.indexOf(category);
+            const categoryEncoding = tf.oneHot(categoryIndex, categories.length).expandDims();
+
+            // Make prediction
+            const prediction = model.predict([imgTensor, categoryEncoding]);
+            const predictionValue = prediction.dataSync()[0];
+            const result = predictionValue > 0.5 ? 'Pass' : 'Fail';
+
+            console.log(`Prediction for ${image.Key}: ${result} (confidence: ${predictionValue})`);
 
             predictions.push({
                 image: image.Key,
                 category,
-                prediction: prediction.data.prediction
-            })
-        }
-        const parser = new Parser()
-        const csv = parser.parse(predictions)
+                prediction: result,
+                confidence: predictionValue
+            });
 
-        const date = new Date()
-        const fileName = `prediction_${date.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' }).replace(/\//g, '-')}.csv`
+            // Dispose tensors
+            tf.dispose([imgTensor, categoryEncoding, prediction]);
+        }
+
+        // Create CSV
+        const parser = new Parser();
+        const csv = parser.parse(predictions);
+
+        // Save CSV to S3
+        const date = new Date();
+        const fileName = `prediction_${date.toISOString().split('T')[0]}.csv`;
 
         const putObjectCommand = new PutObjectCommand({
             Bucket: bucket,
             Key: `predictions/${fileName}`,
             Body: csv,
             ContentType: 'text/csv'
+        });
 
-        })
-
-        await s3Client.send(putObjectCommand)
-        console.log(`Predictions saved to ${fileName}`)
+        await s3Client.send(putObjectCommand);
+        console.log(`Predictions saved to ${fileName} in S3 bucket.`);
     } catch (error) {
-        console.error('Error during predictions:', error)
+        console.error('Error during prediction:', error.message);
     }
 }
 
-testAll()
+const category = categories[Math.floor(Math.random() * categories.length)];
+testPrediction(category);
