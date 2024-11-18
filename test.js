@@ -7,7 +7,7 @@ const bucket = 'weldscanner';
 const categories = ['butt', 'saddle', 'electro'];
 
 async function loadModel() {
-    const modelPath = 'file://path/to/your/model'; // Update with your model path
+    const modelPath = path.join(__dirname, '..', '_trained_models', 'weldscanner_quality_model_v2', 'model.json');
     return await tf.loadLayersModel(modelPath);
 }
 
