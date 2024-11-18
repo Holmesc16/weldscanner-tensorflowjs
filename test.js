@@ -8,7 +8,8 @@ const categories = ['butt', 'saddle', 'electro'];
 const path = require('path');
 
 async function loadModel() {
-    const modelPath = path.join(__dirname, '..', '_trained_models', 'weldscanner_quality_model_v2', 'model.json');
+    const modelPath = 'file:///home/ec2-user/app/_trained_models/weldscanner_quality_model_v2/model.json'; // Ensure this path is correct
+    console.log(`Loading model from ${modelPath}`);
     return await tf.loadLayersModel(modelPath);
 }
 
