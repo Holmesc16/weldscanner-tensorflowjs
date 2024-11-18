@@ -5,7 +5,7 @@ const s3Client = new S3Client({ region: 'us-west-1' })
 const { Parser } = require('json2csv')
 const bucket = 'weldscanner'
 
-asnyc function testAll() {
+async function testAll() {
     try {
         const listCommand = new ListObjectsV2Command({ Bucket: bucket })
         const listResponse = await s3Client.send(listCommand)
