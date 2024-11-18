@@ -1,5 +1,3 @@
-// imageController.js
-
 const processImage = require('../utils/imageProcessor.js')
 const { loadModel } = require('../models/tfModel.js')
 const tf = require('@tensorflow/tfjs-node')
@@ -18,10 +16,7 @@ const streamToBuffer = (stream) => {
         if (!stream || typeof stream.on !== 'function') {
             return reject(new Error('Invalid stream'))
         }
-        stream.on('data', (chunk) => {
-            console.log(`Received chunk of size: ${chunk.length}`)
-            chunks.push(chunk)
-        })
+        stream.on('data', (chunk) => chunks.push(chunk))
         stream.on('end', () => {
             console.log(`Stream ended, concatenating chunks...`)
             resolve(Buffer.concat(chunks))
@@ -48,9 +43,14 @@ const augmentImage = async (imageBuffer) => {
         if (Math.random() > 0.5) sharpImage = sharpImage.flip()
         if (Math.random() > 0.5) sharpImage = sharpImage.flop()
 
-        if (Math.random() > 0.5) sharpImage = sharpImage.blur(Math.random() * 1.5)
-        if (Math.random() > 0.5) sharpImage = sharpImage.grayscale()
+        // Sharp needs sigma for blurring, make the value between 0.3 and 1000
+        if (Math.random() > 0.5) {
+            const sigma = Math.random() * (1000 - 0.3) + 0.3
+            sharpImage = sharpImage.blur(sigma)
+        }
+            
         if (Math.random() > 0.5) sharpImage = sharpImage.sharpen()
+        if (Math.random() > 0.5) sharpImage = sharpImage.grayscale()
 
         // Resize the image to 224x224
         sharpImage = sharpImage.resize(224, 224)
