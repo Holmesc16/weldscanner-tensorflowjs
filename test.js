@@ -5,6 +5,7 @@ const { Parser } = require('json2csv');
 const s3Client = new S3Client({ region: 'us-west-1' });
 const bucket = 'weldscanner';
 const categories = ['butt', 'saddle', 'electro'];
+const path = require('path');
 
 async function loadModel() {
     const modelPath = path.join(__dirname, '..', '_trained_models', 'weldscanner_quality_model_v2', 'model.json');
