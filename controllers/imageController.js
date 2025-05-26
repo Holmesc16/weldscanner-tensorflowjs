@@ -282,7 +282,7 @@ exports.handlePrediction = async (req, res) => {
 
         tf.dispose([imgTensor, categoryEncoding, prediction])
         console.log(`Prediction for ${category}: ${result} (confidence: ${predictionValue})`)
-        res.json({ category, result })
+        res.json({ category, result, confidence: predictionValue })
 
     } catch (err) {
         console.error('Error handling image prediction:', err)
