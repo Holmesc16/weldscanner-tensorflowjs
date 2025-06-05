@@ -304,8 +304,9 @@ exports.handleImage = async (req, res) => {
         const predictionValue = prediction.dataSync()[0]
         const result = predictionValue > 0.5 ? 'Pass' : 'Fail'
 
-        console.log(`Prediction: ${result}`)
-        res.json({ result })
+        console.log(`Prediction: ${result}, confidence: ${predictionValue}`)
+        res.setHeader('Content-Type', 'application/json')
+        res.status(200).json({ result, confidence: predictionValue })
 
         // Dispose tensors after prediction
         img.dispose()
